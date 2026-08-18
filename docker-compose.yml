@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    image: lakehouse-etl-pipeline:latest
+    container_name: lakehouse-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
