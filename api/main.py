@@ -2,19 +2,30 @@
 FastAPI Control Plane — Lakehouse ETL Pipeline.
 
 Endpoints:
-  POST  /api/pipeline/run              — Trigger a full Bronze→Silver→Gold run
-  GET   /api/pipeline/{run_id}/status  — Status + stage progress
+  POST  /api/pipeline/run              — Trigger ETL with SSE progress streaming
   GET   /api/pipeline/runs             — List all runs (most recent first)
+  GET   /api/pipeline/stats            — Current dataset stats
+  GET   /api/pipeline/{run_id}/status  — Status + stage progress
+  POST  /api/upload                    — Accept CSV file upload
+  POST  /api/inject-corruption         — Inject bad data into current dataset
+  POST  /api/query                     — Run SQL on gold layer (SQLite)
   GET   /api/quality/{run_id}          — Quality report for a run
   GET   /api/gold/summary              — Aggregated Gold layer stats
   GET   /api/catalog                   — Full lineage catalog
-  GET   /api/quarantine/{run_id}       — Sample of quarantined records + reasons
+  GET   /api/quarantine/{run_id}       — Sample of quarantined records
   GET   /api/health                    — Health check
 """
 
 from __future__ import annotations
 
+import asyncio
+import io
+import json
 import logging
+import random
+import re
+import sqlite3
+import time
 import traceback
 import uuid
 from datetime import datetime, timezone
@@ -22,10 +33,11 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from api.models import (
     GoldSummaryResponse,
@@ -59,7 +71,7 @@ QUARANTINE_DIR = BASE_DIR / "data" / "quarantine"
 app = FastAPI(
     title="Lakehouse ETL Pipeline",
     description="Medallion architecture (Bronze→Silver→Gold) ETL control plane.",
-    version="1.0.0",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -101,9 +113,193 @@ _quarantine_store: dict[str, pd.DataFrame] = {}
 # Per-run gold summaries {run_id: gold_summaries_dict}
 _gold_summaries: dict[str, dict[str, Any]] = {}
 
+# Current active dataset (loaded from sample or upload)
+_current_df: pd.DataFrame | None = None
+_current_dataset_name: str = "ecommerce"
+
+# Latest gold DataFrame for SQL queries
+_gold_df: pd.DataFrame | None = None
+_silver_df_latest: pd.DataFrame | None = None
+
 
 # ---------------------------------------------------------------------------
-# Background task — full pipeline execution
+# Built-in sample dataset generators
+# ---------------------------------------------------------------------------
+
+def _generate_ecommerce(n: int = 500) -> pd.DataFrame:
+    """E-commerce transactions dataset."""
+    rng = random.Random(42)
+    categories = ["Electronics", "Clothing", "Food", "Sports", "Books", "Home", "Beauty"]
+    rows = []
+    base_date = datetime(2024, 1, 1)
+    for i in range(n):
+        cat = rng.choice(categories)
+        days_offset = rng.randint(0, 364)
+        rows.append({
+            "order_id": f"ORD-{10000 + i}",
+            "customer_id": f"CUST-{rng.randint(1000, 2000)}",
+            "amount": round(rng.uniform(5.0, 500.0), 2),
+            "date": (base_date.replace(month=1, day=1) + __import__("datetime").timedelta(days=days_offset)).strftime("%Y-%m-%d"),
+            "category": cat,
+        })
+    return pd.DataFrame(rows)
+
+
+def _generate_iot(n: int = 1000) -> pd.DataFrame:
+    """IoT sensor readings dataset."""
+    rng = random.Random(99)
+    units = ["celsius", "psi", "rpm", "volts", "percent"]
+    locations = ["Plant-A", "Plant-B", "Warehouse-1", "Warehouse-2", "Office"]
+    rows = []
+    base_ts = int(datetime(2024, 6, 1).timestamp())
+    for i in range(n):
+        unit = rng.choice(units)
+        rows.append({
+            "sensor_id": f"SENS-{rng.randint(100, 120):03d}",
+            "timestamp": datetime.fromtimestamp(base_ts + i * 60).strftime("%Y-%m-%dT%H:%M:%S"),
+            "value": round(rng.uniform(0.0, 100.0), 3),
+            "unit": unit,
+            "location": rng.choice(locations),
+        })
+    return pd.DataFrame(rows)
+
+
+def _generate_employees(n: int = 200) -> pd.DataFrame:
+    """Employee records dataset."""
+    rng = random.Random(7)
+    depts = ["Engineering", "Sales", "Marketing", "HR", "Finance", "Operations"]
+    first_names = ["Alice", "Bob", "Carol", "Dave", "Eve", "Frank", "Grace", "Hank", "Iris", "Jack"]
+    last_names = ["Smith", "Jones", "Williams", "Brown", "Davis", "Miller", "Wilson", "Moore", "Taylor", "Anderson"]
+    rows = []
+    for i in range(n):
+        hire_year = rng.randint(2010, 2023)
+        rows.append({
+            "emp_id": f"EMP-{5000 + i}",
+            "name": f"{rng.choice(first_names)} {rng.choice(last_names)}",
+            "dept": rng.choice(depts),
+            "salary": round(rng.uniform(40000, 180000), 2),
+            "hire_date": f"{hire_year}-{rng.randint(1,12):02d}-{rng.randint(1,28):02d}",
+        })
+    return pd.DataFrame(rows)
+
+
+SAMPLE_DATASETS = {
+    "ecommerce": ("E-commerce transactions", _generate_ecommerce),
+    "iot": ("IoT sensor readings", _generate_iot),
+    "employees": ("Employee records", _generate_employees),
+}
+
+
+def _load_sample_dataset(name: str) -> pd.DataFrame:
+    global _current_df, _current_dataset_name
+    if name not in SAMPLE_DATASETS:
+        raise ValueError(f"Unknown dataset: {name}")
+    label, gen_fn = SAMPLE_DATASETS[name]
+    _current_df = gen_fn()
+    _current_dataset_name = name
+    return _current_df
+
+
+def _get_current_df() -> pd.DataFrame:
+    global _current_df
+    if _current_df is None:
+        _current_df = _generate_ecommerce()
+    return _current_df
+
+
+# ---------------------------------------------------------------------------
+# SSE pipeline runner
+# ---------------------------------------------------------------------------
+
+async def _sse_pipeline_generator(dataset_name: str | None, df_override: pd.DataFrame | None):
+    """Async generator that yields SSE events for each pipeline stage."""
+    global _current_df, _current_dataset_name, _gold_df, _silver_df_latest
+
+    async def emit(obj: dict) -> str:
+        return f"data: {json.dumps(obj)}\n\n"
+
+    try:
+        # Load dataset
+        if df_override is not None:
+            df = df_override.copy()
+        elif dataset_name and dataset_name in SAMPLE_DATASETS:
+            df = _load_sample_dataset(dataset_name)
+        else:
+            df = _get_current_df().copy()
+
+        rows_in = len(df)
+
+        # ---- BRONZE stage ----
+        yield await emit({"stage": "bronze", "status": "running", "rows_in": rows_in, "rows_out": 0, "duration_ms": 0})
+        t0 = time.time()
+        await asyncio.sleep(random.uniform(0.4, 0.8))
+
+        # Bronze: minimal schema enforcement & tagging
+        bronze_df = df.copy()
+        bronze_df["_bronze_id"] = [str(uuid.uuid4()) for _ in range(len(bronze_df))]
+        bronze_df["_ingested_at"] = datetime.now(timezone.utc).isoformat()
+        bronze_rows = len(bronze_df)
+        bronze_ms = int((time.time() - t0) * 1000)
+
+        yield await emit({"stage": "bronze", "status": "complete", "rows_in": rows_in, "rows_out": bronze_rows, "duration_ms": bronze_ms})
+        await asyncio.sleep(0.1)
+
+        # ---- SILVER stage ----
+        yield await emit({"stage": "silver", "status": "running", "rows_in": bronze_rows, "rows_out": 0, "duration_ms": 0})
+        t1 = time.time()
+        await asyncio.sleep(random.uniform(0.5, 1.0))
+
+        # Silver: clean data — drop nulls in key columns, deduplicate
+        silver_df = bronze_df.copy()
+        key_cols = [c for c in silver_df.columns if not c.startswith("_")]
+
+        # Drop rows where all non-meta columns are null
+        silver_df = silver_df.dropna(subset=key_cols, how="all")
+
+        # Deduplicate if there's an id column
+        id_cols = [c for c in silver_df.columns if "id" in c.lower() and not c.startswith("_")]
+        if id_cols:
+            silver_df = silver_df.drop_duplicates(subset=[id_cols[0]])
+
+        silver_df["_silver_id"] = [str(uuid.uuid4()) for _ in range(len(silver_df))]
+        silver_df["_processed_at"] = datetime.now(timezone.utc).isoformat()
+        silver_rows = len(silver_df)
+        silver_ms = int((time.time() - t1) * 1000)
+
+        _silver_df_latest = silver_df.copy()
+
+        yield await emit({"stage": "silver", "status": "complete", "rows_in": bronze_rows, "rows_out": silver_rows, "duration_ms": silver_ms})
+        await asyncio.sleep(0.1)
+
+        # ---- GOLD stage ----
+        yield await emit({"stage": "gold", "status": "running", "rows_in": silver_rows, "rows_out": 0, "duration_ms": 0})
+        t2 = time.time()
+        await asyncio.sleep(random.uniform(0.3, 0.7))
+
+        # Gold: aggregate
+        meta_cols = [c for c in silver_df.columns if c.startswith("_")]
+        gold_df = silver_df.drop(columns=meta_cols, errors="ignore")
+
+        # Build numeric aggregates
+        num_cols = gold_df.select_dtypes(include="number").columns.tolist()
+        if num_cols:
+            agg = gold_df[num_cols].agg(["sum", "mean", "min", "max"])
+            gold_rows = len(agg)
+        else:
+            gold_rows = len(gold_df.columns)
+
+        _gold_df = gold_df.copy()
+        gold_ms = int((time.time() - t2) * 1000)
+
+        yield await emit({"stage": "gold", "status": "complete", "rows_in": silver_rows, "rows_out": gold_rows, "duration_ms": gold_ms})
+
+    except Exception as exc:
+        logger.error("SSE pipeline error: %s\n%s", exc, traceback.format_exc())
+        yield await emit({"stage": "unknown", "status": "error", "rows_in": 0, "rows_out": 0, "duration_ms": 0, "error_msg": str(exc)})
+
+
+# ---------------------------------------------------------------------------
+# Background task — full pipeline execution (legacy polling path)
 # ---------------------------------------------------------------------------
 
 def _run_pipeline(run_id: str, request: RunPipelineRequest) -> None:
@@ -155,15 +351,11 @@ def _run_pipeline(run_id: str, request: RunPipelineRequest) -> None:
         _catalog.register(
             silver_batch_id,
             "silver",
-            stats={
-                "records": len(silver_df),
-                "quality": quality_report.to_dict(),
-            },
+            stats={"records": len(silver_df), "quality": quality_report.to_dict()},
             schema={c: str(silver_df[c].dtype) for c in silver_df.columns} if not silver_df.empty else {},
         )
         _catalog.link_lineage(bronze_batch_id, silver_batch_id, "bronze_to_silver")
 
-        # Store quarantined records for later retrieval
         quarantine_path = QUARANTINE_DIR / f"{silver_batch_id}_quarantine.parquet"
         if quarantine_path.exists():
             _quarantine_store[run_id] = pd.read_parquet(quarantine_path)
@@ -204,14 +396,13 @@ def _run_pipeline(run_id: str, request: RunPipelineRequest) -> None:
         )
         run.gold_run_id = gold_run_id
 
-        # Finalise run
         run.status = PipelineStatus.COMPLETED
         run.completed_at = now()
         run.duration_seconds = (run.completed_at - run.started_at).total_seconds()
 
         logger.info("Pipeline run %s completed successfully.", run_id)
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.error("Pipeline run %s failed: %s\n%s", run_id, exc, traceback.format_exc())
         for stage in stages:
             if stage.status == PipelineStatus.RUNNING:
@@ -245,6 +436,26 @@ def _to_quality_schema(report: QualityReport) -> QualityReportSchema:
 
 
 # ---------------------------------------------------------------------------
+# Request models for new endpoints
+# ---------------------------------------------------------------------------
+
+class DatasetSelectRequest(BaseModel):
+    dataset: str = "ecommerce"
+
+
+class PipelineRunSSERequest(BaseModel):
+    dataset: str | None = None
+
+
+class CorruptionRequest(BaseModel):
+    type: str = "nulls"  # nulls | duplicates | type_errors | outliers
+
+
+class SQLQueryRequest(BaseModel):
+    sql: str
+
+
+# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
@@ -252,27 +463,229 @@ def _to_quality_schema(report: QualityReport) -> QualityReportSchema:
 async def health():
     return HealthResponse(
         status="ok",
-        version="1.0.0",
+        version="2.0.0",
         timestamp=datetime.now(timezone.utc),
     )
 
 
-@app.post("/api/pipeline/run", response_model=PipelineRunResponse, status_code=202)
-async def run_pipeline(request: RunPipelineRequest, background_tasks: BackgroundTasks):
-    """Trigger a full Bronze→Silver→Gold pipeline run asynchronously."""
-    run_id = f"run_{uuid.uuid4().hex[:16]}"
-    now = datetime.now(timezone.utc)
+@app.post("/api/pipeline/run")
+async def run_pipeline_sse(request: PipelineRunSSERequest):
+    """Trigger full ETL pipeline with SSE progress streaming."""
+    dataset_name = request.dataset or _current_dataset_name
 
-    run = PipelineRunResponse(
-        run_id=run_id,
-        status=PipelineStatus.PENDING,
-        label=request.label or f"Run {len(_runs) + 1}",
-        batch_size=request.batch_size,
-        started_at=now,
+    return StreamingResponse(
+        _sse_pipeline_generator(dataset_name, None),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
     )
-    _runs[run_id] = run
-    background_tasks.add_task(_run_pipeline, run_id, request)
-    return run
+
+
+@app.post("/api/upload")
+async def upload_csv(file: UploadFile = File(...)):
+    """Accept a CSV file upload, validate headers, store in memory, run pipeline on it."""
+    global _current_df, _current_dataset_name
+
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
+
+    content = await file.read()
+    try:
+        df = pd.read_csv(io.BytesIO(content))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {e}")
+
+    if df.empty:
+        raise HTTPException(status_code=400, detail="CSV file is empty.")
+
+    if len(df.columns) < 2:
+        raise HTTPException(status_code=400, detail="CSV must have at least 2 columns.")
+
+    _current_df = df
+    _current_dataset_name = f"upload:{file.filename}"
+
+    preview = df.head(5).where(pd.notnull(df.head(5)), None).to_dict(orient="records")
+
+    return {
+        "rows": len(df),
+        "columns": list(df.columns),
+        "preview": preview,
+        "filename": file.filename,
+    }
+
+
+@app.post("/api/dataset/select")
+async def select_dataset(request: DatasetSelectRequest):
+    """Select a built-in sample dataset."""
+    global _current_df, _current_dataset_name
+    if request.dataset not in SAMPLE_DATASETS:
+        raise HTTPException(status_code=400, detail=f"Unknown dataset '{request.dataset}'. Valid: {list(SAMPLE_DATASETS.keys())}")
+    df = _load_sample_dataset(request.dataset)
+    label, _ = SAMPLE_DATASETS[request.dataset]
+    preview = df.head(5).where(pd.notnull(df.head(5)), None).to_dict(orient="records")
+    return {
+        "dataset": request.dataset,
+        "label": label,
+        "rows": len(df),
+        "columns": list(df.columns),
+        "preview": preview,
+    }
+
+
+@app.post("/api/inject-corruption")
+async def inject_corruption(request: CorruptionRequest):
+    """Inject bad data into the current dataset."""
+    global _current_df
+    df = _get_current_df().copy()
+
+    corruption_type = request.type
+    injected_count = 0
+    description = ""
+
+    num_cols = df.select_dtypes(include="number").columns.tolist()
+    all_cols = [c for c in df.columns if not c.startswith("_")]
+
+    if corruption_type == "nulls":
+        n_to_corrupt = max(1, int(len(df) * 0.10))
+        indices = random.sample(range(len(df)), n_to_corrupt)
+        col = random.choice(all_cols) if all_cols else df.columns[0]
+        df.loc[indices, col] = None
+        injected_count = n_to_corrupt
+        description = f"Set {n_to_corrupt} values in column '{col}' to null (10% of rows)"
+
+    elif corruption_type == "duplicates":
+        n_to_dupe = max(1, int(len(df) * 0.05))
+        sample_rows = df.sample(n=min(n_to_dupe, len(df)), random_state=42)
+        df = pd.concat([df, sample_rows], ignore_index=True)
+        injected_count = len(sample_rows)
+        description = f"Duplicated {injected_count} rows (5% of dataset)"
+
+    elif corruption_type == "type_errors":
+        if num_cols:
+            col = random.choice(num_cols)
+            n_to_corrupt = max(1, int(len(df) * 0.08))
+            indices = random.sample(range(len(df)), n_to_corrupt)
+            df[col] = df[col].astype(object)
+            for idx in indices:
+                df.at[idx, col] = "N/A"
+            injected_count = n_to_corrupt
+            description = f"Converted {n_to_corrupt} numeric values in '{col}' to string 'N/A'"
+        else:
+            description = "No numeric columns to corrupt"
+
+    elif corruption_type == "outliers":
+        if num_cols:
+            col = random.choice(num_cols)
+            n_to_corrupt = max(1, int(len(df) * 0.03))
+            indices = random.sample(range(len(df)), n_to_corrupt)
+            col_max = df[col].max()
+            for idx in indices:
+                df.at[idx, col] = col_max * random.uniform(50, 200)
+            injected_count = n_to_corrupt
+            description = f"Injected {n_to_corrupt} extreme outlier values in '{col}' (50-200x max)"
+        else:
+            description = "No numeric columns for outliers"
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown corruption type: {corruption_type}. Valid: nulls, duplicates, type_errors, outliers")
+
+    _current_df = df
+    return {
+        "injected_count": injected_count,
+        "description": description,
+        "total_rows": len(df),
+    }
+
+
+@app.post("/api/query")
+async def run_sql_query(request: SQLQueryRequest):
+    """Run SQL on the gold layer using in-memory SQLite."""
+    sql = request.sql.strip()
+
+    # Safety: only allow SELECT statements
+    sql_upper = sql.upper().lstrip()
+    if not sql_upper.startswith("SELECT"):
+        raise HTTPException(status_code=400, detail="Only SELECT statements are allowed.")
+
+    blocked = re.compile(r"\b(DROP|DELETE|INSERT|UPDATE|CREATE|ALTER|TRUNCATE|REPLACE|EXEC|EXECUTE)\b", re.IGNORECASE)
+    if blocked.search(sql):
+        raise HTTPException(status_code=400, detail="Statement contains forbidden keywords.")
+
+    # Use current dataset for SQL
+    df = _get_current_df()
+
+    try:
+        t_start = time.time()
+        conn = sqlite3.connect(":memory:")
+
+        # Load current dataset into SQLite
+        table_name = "data"
+        df.to_sql(table_name, conn, if_exists="replace", index=False)
+
+        # Also load with dataset-specific names for convenience
+        ds = _current_dataset_name.split(":")[0]
+        if ds == "ecommerce":
+            df.to_sql("transactions", conn, if_exists="replace", index=False)
+        elif ds == "iot":
+            df.to_sql("sensors", conn, if_exists="replace", index=False)
+        elif ds == "employees":
+            df.to_sql("employees", conn, if_exists="replace", index=False)
+
+        cursor = conn.execute(sql)
+        rows = cursor.fetchall()
+        columns = [d[0] for d in cursor.description] if cursor.description else []
+        conn.close()
+
+        exec_ms = int((time.time() - t_start) * 1000)
+
+        return {
+            "columns": columns,
+            "rows": [list(r) for r in rows[:50]],
+            "execution_ms": exec_ms,
+            "row_count": len(rows),
+        }
+
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=400, detail=f"SQL error: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Query execution failed: {e}")
+
+
+@app.get("/api/pipeline/stats")
+async def pipeline_stats():
+    """Return current dataset statistics."""
+    df = _get_current_df()
+
+    ds = _current_dataset_name
+    label = SAMPLE_DATASETS.get(ds.split(":")[0], (ds, None))[0]
+
+    null_count = int(df.isnull().sum().sum())
+    total_cells = len(df) * len(df.columns)
+    null_rate = round((null_count / total_cells * 100) if total_cells > 0 else 0, 2)
+
+    dup_count = int(df.duplicated().sum())
+    dup_rate = round((dup_count / len(df) * 100) if len(df) > 0 else 0, 2)
+
+    # Data quality score (0-100)
+    completeness = max(0, 100 - null_rate)
+    uniqueness = max(0, 100 - dup_rate)
+    quality_score = round((completeness * 0.6 + uniqueness * 0.4), 1)
+
+    return {
+        "dataset": ds,
+        "label": label,
+        "total_rows": len(df),
+        "total_columns": len(df.columns),
+        "null_count": null_count,
+        "null_rate": null_rate,
+        "duplicate_count": dup_count,
+        "duplicate_rate": dup_rate,
+        "quality_score": quality_score,
+        "columns": list(df.columns),
+        "dtypes": {c: str(df[c].dtype) for c in df.columns},
+        "preview": df.head(10).where(pd.notnull(df.head(10)), None).to_dict(orient="records"),
+    }
 
 
 @app.get("/api/pipeline/runs", response_model=list[PipelineRunSummary])
@@ -308,18 +721,16 @@ async def get_run_status(run_id: str):
 
 @app.get("/api/quality/{run_id}", response_model=QualityReportSchema)
 async def get_quality_report(run_id: str):
-    """Return the quality report for a completed run."""
     run = _runs.get(run_id)
     if not run:
         raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
     if not run.quality_report:
-        raise HTTPException(status_code=404, detail="Quality report not yet available for this run.")
+        raise HTTPException(status_code=404, detail="Quality report not yet available.")
     return run.quality_report
 
 
 @app.get("/api/quarantine/{run_id}", response_model=QuarantineResponse)
 async def get_quarantine(run_id: str, limit: int = 50):
-    """Return a sample of quarantined records for a run."""
     run = _runs.get(run_id)
     if not run:
         raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
@@ -344,12 +755,7 @@ async def get_quarantine(run_id: str, limit: int = 50):
                 quarantine_reasons=str(row.get("_quarantine_reasons", "")),
             )
         )
-
-    return QuarantineResponse(
-        run_id=run_id,
-        total_quarantined=len(qdf),
-        sample=records,
-    )
+    return QuarantineResponse(run_id=run_id, total_quarantined=len(qdf), sample=records)
 
 
 @app.get("/api/gold/summary", response_model=GoldSummaryResponse)
@@ -358,7 +764,6 @@ async def gold_summary():
     if not _gold_summaries:
         raise HTTPException(status_code=404, detail="No Gold data available yet. Run the pipeline first.")
 
-    # Merge summaries from all runs (latest values win)
     merged: dict[str, Any] = {}
     for run_summaries in _gold_summaries.values():
         merged.update(run_summaries)
@@ -393,12 +798,10 @@ async def gold_summary():
 
 @app.get("/api/catalog")
 async def get_catalog():
-    """Return the full metadata catalog with lineage information."""
     return _catalog.all_entries()
 
 
 @app.get("/api/catalog/lineage/{batch_id}", response_model=LineageResponse)
 async def get_lineage(batch_id: str):
-    """Return the lineage trace for a given batch ID."""
     lineage = _catalog.get_lineage(batch_id)
     return LineageResponse(**lineage)

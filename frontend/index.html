@@ -3,1047 +3,1589 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lakehouse</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <title>Lakehouse ETL Pipeline</title>
   <style>
-    /* ─── tokens ─────────────────────────────────────────────── */
     :root {
-      --paper:        #FAF9F6;
-      --ink:          #18181B;
-      --stone:        #71717A;
-      --border:       rgba(24,24,27,0.10);
-      --accent:       #0D9488;
-      --accent-light: rgba(13,148,136,0.08);
-      --green:        #16A34A;
-      --green-light:  rgba(22,163,74,0.10);
-      --amber:        #D97706;
-      --amber-light:  rgba(217,119,6,0.10);
-      --red:          #DC2626;
-      --red-light:    rgba(220,38,38,0.10);
+      --bg:        #0a0e1a;
+      --bg2:       #111827;
+      --bg3:       #1a2235;
+      --border:    rgba(255,255,255,0.08);
+      --border2:   rgba(255,255,255,0.14);
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --bronze:    #f59e0b;
+      --bronze-bg: rgba(245,158,11,0.12);
+      --silver:    #94a3b8;
+      --silver-bg: rgba(148,163,184,0.10);
+      --gold:      #eab308;
+      --gold-bg:   rgba(234,179,8,0.12);
+      --green:     #22c55e;
+      --green-bg:  rgba(34,197,94,0.12);
+      --red:       #ef4444;
+      --red-bg:    rgba(239,68,68,0.12);
+      --blue:      #3b82f6;
+      --blue-bg:   rgba(59,130,246,0.12);
     }
 
-    /* ─── reset ──────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
-      background: var(--paper);
-      color: var(--ink);
-      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-      font-size: 14px;
-      line-height: 1.6;
-      min-height: 100%;
-    }
-
-    /* ─── layout ─────────────────────────────────────────────── */
-    .wrap {
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 48px 24px 96px;
-    }
-
-    /* ─── header ─────────────────────────────────────────────── */
-    .site-header {
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      padding-bottom: 28px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 48px;
-    }
-
-    .site-title {
-      font-family: 'Instrument Serif', Georgia, serif;
-      font-size: 36px;
-      font-weight: 400;
-      letter-spacing: -0.5px;
-      line-height: 1;
-      color: var(--ink);
-    }
-
-    .site-tagline {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       font-size: 13px;
-      color: var(--stone);
-      margin-top: 4px;
-      font-weight: 400;
-      letter-spacing: 0.2px;
+      line-height: 1.5;
+      min-height: 100vh;
     }
 
-    .health-dot {
+    /* ── Scrollbars ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+    /* ── Layout ── */
+    .page { display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* ── TOP HEADER ── */
+    .top-header {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 60px;
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      color: var(--stone);
-    }
-
-    .health-dot .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--stone);
-      transition: background 0.3s;
-    }
-
-    .health-dot.ok .dot  { background: var(--green); }
-    .health-dot.err .dot { background: var(--red); }
-
-    /* ─── section label ──────────────────────────────────────── */
-    .section-label {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      color: var(--stone);
-      margin-bottom: 16px;
-    }
-
-    /* ─── trigger block ──────────────────────────────────────── */
-    .trigger-block {
-      margin-bottom: 48px;
-    }
-
-    .inputs-row {
-      display: flex;
       gap: 20px;
-      align-items: flex-end;
-      flex-wrap: wrap;
-      margin-bottom: 20px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      flex-shrink: 0;
     }
 
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .field label {
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--stone);
-    }
-
-    .field input[type="number"] {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: 15px;
-      font-weight: 500;
-      padding: 10px 14px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: white;
-      color: var(--ink);
-      width: 130px;
-      outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
-    }
-
-    .field input[type="number"]:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-light);
-    }
-
-    /* slider */
-    .slider-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .slider-wrap label {
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--stone);
-    }
-
-    .slider-row {
+    .header-brand {
       display: flex;
       align-items: center;
       gap: 10px;
+      flex-shrink: 0;
     }
 
-    .slider-row input[type="range"] {
-      -webkit-appearance: none;
-      width: 200px;
-      height: 4px;
-      border-radius: 4px;
+    .header-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--bronze), var(--gold));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .header-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+
+    .header-sub {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .header-divider {
+      width: 1px; height: 30px;
       background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+    }
+
+    select.ds-select {
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
       outline: none;
-      cursor: pointer;
+      min-width: 200px;
     }
+    select.ds-select:focus { border-color: var(--blue); }
 
-    .slider-row input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: var(--accent);
-      cursor: pointer;
-      transition: transform 0.1s;
-    }
-
-    .slider-row input[type="range"]::-webkit-slider-thumb:hover {
-      transform: scale(1.15);
-    }
-
-    .slider-val {
-      font-size: 14px;
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
       font-weight: 600;
-      color: var(--ink);
-      min-width: 34px;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      white-space: nowrap;
+      outline: none;
     }
+    .btn:hover { opacity: 0.85; }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
 
     .btn-run {
+      background: linear-gradient(135deg, #16a34a, #22c55e);
+      color: #fff;
+    }
+
+    .btn-upload {
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      color: var(--text);
+    }
+
+    .corrupt-group { position: relative; }
+    .btn-corrupt {
+      background: linear-gradient(135deg, #b45309, #f59e0b);
+      color: #fff;
+    }
+
+    .corrupt-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      overflow: hidden;
+      min-width: 200px;
+      z-index: 200;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    }
+    .corrupt-menu.open { display: block; }
+
+    .corrupt-menu-item {
+      padding: 9px 14px;
+      cursor: pointer;
+      transition: background 0.1s;
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 11px 24px;
-      background: var(--accent);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s, opacity 0.15s;
-      white-space: nowrap;
-    }
-
-    .btn-run:hover { background: #0f766e; }
-    .btn-run:disabled { opacity: 0.45; cursor: not-allowed; }
-
-    @media (max-width: 640px) {
-      .btn-run { width: 100%; justify-content: center; }
-      .inputs-row { flex-direction: column; align-items: stretch; }
-    }
-
-    /* ─── run history table ───────────────────────────────────── */
-    .history-table-wrap {
-      overflow-x: auto;
-    }
-
-    .history-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-
-    .history-table th {
-      text-align: left;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      color: var(--stone);
-      padding: 6px 12px 10px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .history-table td {
-      padding: 9px 12px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: middle;
-      color: var(--ink);
-    }
-
-    .history-table tr:last-child td { border-bottom: none; }
-
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 2px 9px 2px 6px;
-      border-radius: 99px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-    }
-
-    .status-pill .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .status-pill.completed  { background: var(--green-light);  color: var(--green); }
-    .status-pill.completed .dot { background: var(--green); }
-    .status-pill.running    { background: var(--accent-light); color: var(--accent); }
-    .status-pill.running .dot { background: var(--accent); }
-    .status-pill.pending    { background: rgba(24,24,27,0.06); color: var(--stone); }
-    .status-pill.pending .dot { background: var(--stone); }
-    .status-pill.failed     { background: var(--red-light);  color: var(--red); }
-    .status-pill.failed .dot { background: var(--red); }
-
-    .mono { font-variant-numeric: tabular-nums; }
-
-    .empty-note {
-      color: var(--stone);
-      text-align: center;
-      padding: 28px;
-      font-size: 13px;
-    }
-
-    /* ─── stage progress ─────────────────────────────────────── */
-    .stages-section {
-      display: none;
-      margin-bottom: 48px;
-    }
-
-    .stages-section.visible { display: block; }
-
-    .stages-row {
-      display: flex;
-      align-items: center;
-      gap: 0;
-    }
-
-    .stage-block {
-      flex: 1;
-      padding: 24px 20px;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: white;
-      position: relative;
-      transition: border-color 0.3s, box-shadow 0.3s;
-    }
-
-    .stage-block.state-running {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-light), 0 2px 16px rgba(13,148,136,0.08);
-    }
-
-    .stage-block.state-done {
-      border-color: rgba(22,163,74,0.35);
-    }
-
-    .stage-block.state-failed {
-      border-color: var(--red);
-    }
-
-    .stage-name {
-      font-family: 'Instrument Serif', Georgia, serif;
-      font-size: 22px;
-      font-weight: 400;
-      color: var(--ink);
-      margin-bottom: 2px;
-    }
-
-    .stage-status-text {
       font-size: 12px;
-      font-weight: 500;
-      color: var(--stone);
+    }
+    .corrupt-menu-item:hover { background: var(--bg3); }
+    .corrupt-menu-item .ci { font-size: 14px; }
+
+    .health-indicator {
+      margin-left: auto;
       display: flex;
       align-items: center;
       gap: 6px;
-      margin-bottom: 12px;
-    }
-
-    .stage-status-text.running { color: var(--accent); }
-    .stage-status-text.done    { color: var(--green); }
-    .stage-status-text.failed  { color: var(--red); }
-
-    .pulse-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--accent);
-      animation: pulse 1.4s ease-in-out infinite;
-      flex-shrink: 0;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: 0.4; transform: scale(0.75); }
-    }
-
-    .stage-records {
-      display: flex;
-      gap: 20px;
-    }
-
-    .stage-record-item .val {
-      font-size: 24px;
-      font-weight: 600;
-      color: var(--ink);
-      line-height: 1.1;
-    }
-
-    .stage-record-item .lbl {
       font-size: 11px;
-      color: var(--stone);
-      margin-top: 1px;
+      color: var(--muted);
+    }
+    .health-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+    .health-dot.ok { background: var(--green); }
+    .health-dot.err { background: var(--red); }
+
+    /* ── MAIN CONTENT ── */
+    .main-content {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      grid-template-rows: auto 1fr;
+      gap: 0;
+      overflow: hidden;
     }
 
-    .stage-record-item.muted .val { color: var(--stone); }
+    /* ── PIPELINE FLOW (center) ── */
+    .pipeline-section {
+      grid-column: 1;
+      grid-row: 1;
+      padding: 20px 20px 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
 
-    /* connector arrows */
-    .stage-connector {
-      flex: 0 0 auto;
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .pipeline-flow {
       display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 0 12px;
-      gap: 4px;
+      align-items: stretch;
+      gap: 0;
     }
 
-    .connector-line {
-      width: 40px;
-      height: 2px;
-      background: var(--border);
-      border-radius: 2px;
+    .tier-card {
+      flex: 1;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      transition: border-color 0.3s, box-shadow 0.3s;
       position: relative;
       overflow: hidden;
     }
 
-    .connector-line::after {
+    .tier-card::before {
       content: '';
       position: absolute;
-      left: -100%;
-      top: 0;
-      height: 100%;
-      width: 100%;
-      background: var(--accent);
-      border-radius: 2px;
-      transition: left 0.6s ease;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: 10px 10px 0 0;
     }
 
-    .connector-line.active::after { left: 0; }
+    .tier-card.bronze::before { background: var(--bronze); }
+    .tier-card.silver::before { background: var(--silver); }
+    .tier-card.gold::before   { background: var(--gold); }
 
-    .connector-chevron {
-      color: var(--border);
-      transition: color 0.3s;
+    .tier-card.state-running {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 1px var(--blue), 0 4px 24px rgba(59,130,246,0.15);
     }
+    .tier-card.state-complete.bronze { border-color: rgba(245,158,11,0.5); }
+    .tier-card.state-complete.silver { border-color: rgba(148,163,184,0.5); }
+    .tier-card.state-complete.gold   { border-color: rgba(234,179,8,0.5); }
+    .tier-card.state-error { border-color: var(--red); box-shadow: 0 0 0 1px var(--red); }
 
-    .connector-chevron.active { color: var(--accent); }
-
-    @media (max-width: 640px) {
-      .stages-row { flex-direction: column; align-items: stretch; gap: 12px; }
-      .stage-connector { flex-direction: row; padding: 0; }
-      .connector-line { width: 24px; }
-    }
-
-    /* ─── quality gate ────────────────────────────────────────── */
-    .quality-section {
-      display: none;
-      margin-bottom: 48px;
-    }
-
-    .quality-section.visible { display: block; }
-
-    .quality-header {
+    .tier-header {
       display: flex;
-      align-items: baseline;
-      gap: 16px;
-      margin-bottom: 28px;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
     }
 
-    .big-pct {
-      font-family: 'Instrument Serif', Georgia, serif;
-      font-size: 56px;
+    .tier-icon {
+      font-size: 18px;
       line-height: 1;
-      color: var(--accent);
     }
 
-    .quality-subtext {
+    .tier-name {
       font-size: 14px;
-      color: var(--stone);
-      line-height: 1.5;
+      font-weight: 700;
+    }
+    .tier-card.bronze .tier-name { color: var(--bronze); }
+    .tier-card.silver .tier-name { color: var(--silver); }
+    .tier-card.gold   .tier-name { color: var(--gold); }
+
+    .tier-sub {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 1px;
     }
 
-    .quality-subtext strong {
-      color: var(--ink);
+    .tier-status {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
       font-weight: 600;
     }
 
-    /* rule bars */
-    .rule-list {
+    .tier-status.idle    { color: var(--muted); }
+    .tier-status.running { color: var(--blue); }
+    .tier-status.complete { color: var(--green); }
+    .tier-status.error   { color: var(--red); }
+
+    .pulse-ring {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--blue);
+      animation: pulse-ring 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-ring {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    .tier-stats {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .tier-stat { }
+    .tier-stat-val {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+    .tier-stat-val.muted { color: var(--muted); }
+    .tier-stat-lbl {
+      font-size: 9px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+    }
+
+    .tier-badges {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .badge {
+      padding: 2px 7px;
+      border-radius: 99px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .badge-duration {
+      background: var(--bg3);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .badge-pct {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+    .badge-pct.warn { background: rgba(245,158,11,0.12); color: var(--bronze); }
+    .badge-pct.err  { background: var(--red-bg); color: var(--red); }
+
+    /* ── PIPELINE ARROWS ── */
+    .pipeline-arrow {
+      flex: 0 0 40px;
       display: flex;
       flex-direction: column;
-      gap: 0;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-      background: white;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 0 4px;
     }
 
-    .rule-row {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 12px 18px;
+    .arrow-line {
+      width: 100%;
+      height: 2px;
+      background: var(--border);
+      position: relative;
+      overflow: hidden;
+      border-radius: 2px;
+    }
+
+    .arrow-line-fill {
+      position: absolute;
+      top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, var(--blue), transparent);
+      animation: none;
+    }
+
+    .arrow-line-fill.flowing {
+      animation: flow 1.2s linear infinite;
+    }
+
+    .arrow-line-fill.done {
+      background: var(--green);
+      left: 0;
+      animation: none;
+    }
+
+    @keyframes flow {
+      0%   { left: -100%; }
+      100% { left: 100%; }
+    }
+
+    .arrow-chevron {
+      color: var(--border2);
+      font-size: 12px;
+      transition: color 0.3s;
+    }
+    .arrow-chevron.active { color: var(--green); }
+
+    /* ── BOTTOM AREA ── */
+    .bottom-area {
+      grid-column: 1;
+      grid-row: 2;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      overflow: auto;
+    }
+
+    /* ── DATA PREVIEW ── */
+    .preview-panel {
+      padding: 20px;
+      border-right: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
+      overflow: auto;
+      min-height: 0;
     }
 
-    .rule-row:last-child { border-bottom: none; }
-
-    .rule-name-col {
-      flex: 0 0 220px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--ink);
-    }
-
-    .rule-bar-col {
-      flex: 1;
+    .preview-header {
       display: flex;
       align-items: center;
-      gap: 10px;
+      justify-content: space-between;
+      margin-bottom: 12px;
     }
 
-    .rule-bar-track {
-      flex: 1;
-      height: 6px;
-      background: rgba(24,24,27,0.07);
-      border-radius: 99px;
+    .preview-table-wrap {
+      overflow: auto;
+      max-height: 340px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .data-table th {
+      background: var(--bg3);
+      padding: 7px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .data-table th .type-badge {
+      display: inline-block;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 3px;
+      padding: 1px 4px;
+      font-size: 9px;
+      margin-left: 4px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .data-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .data-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table td.null { color: var(--muted); font-style: italic; }
+
+    /* ── SQL CONSOLE ── */
+    .sql-panel {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow: auto;
+    }
+
+    .sql-editor-wrap {
+      position: relative;
+    }
+
+    .sql-editor {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      color: #c9d1d9;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 12px;
+      padding: 12px;
+      resize: vertical;
+      min-height: 90px;
+      outline: none;
+      line-height: 1.6;
+      transition: border-color 0.2s;
+    }
+    .sql-editor:focus { border-color: var(--blue); }
+
+    .sql-run-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-query {
+      background: var(--blue);
+      color: #fff;
+    }
+
+    .exec-badge {
+      font-size: 11px;
+      color: var(--muted);
+      padding: 3px 8px;
+      background: var(--bg3);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .sql-error {
+      background: var(--red-bg);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: var(--red);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+      display: none;
+    }
+    .sql-error.visible { display: block; }
+
+    .sql-results-wrap {
+      overflow: auto;
+      max-height: 200px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: none;
+    }
+    .sql-results-wrap.visible { display: block; }
+
+    /* ── RIGHT PANEL ── */
+    .right-panel {
+      grid-column: 2;
+      grid-row: 1 / 3;
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
       overflow: hidden;
     }
 
-    .rule-bar-fill {
+    /* ── STATS PANEL ── */
+    .stats-panel {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stat-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .stat-card .s-val {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .stat-card .s-lbl {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .quality-score-bar {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+
+    .quality-score-fill {
       height: 100%;
-      border-radius: 99px;
+      border-radius: 2px;
+      background: var(--green);
       transition: width 0.5s ease;
     }
 
-    .rule-bar-fill.green { background: var(--green); }
-    .rule-bar-fill.amber { background: var(--amber); }
-    .rule-bar-fill.red   { background: var(--red); }
+    /* ── LIVE LOG ── */
+    .log-panel {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      min-height: 0;
+    }
 
-    .rule-fail-pct {
-      font-size: 12px;
+    .log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+
+    .log-entries {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 11px;
+    }
+
+    .log-entry {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+    }
+
+    .log-icon { flex-shrink: 0; }
+    .log-icon.ok    { color: var(--green); }
+    .log-icon.run   { color: var(--blue); }
+    .log-icon.err   { color: var(--red); }
+    .log-icon.info  { color: var(--muted); }
+
+    .log-text { flex: 1; color: var(--text); line-height: 1.4; }
+    .log-time { color: var(--muted); font-size: 10px; flex-shrink: 0; }
+
+    .log-empty {
+      color: var(--muted);
+      font-size: 11px;
+      text-align: center;
+      padding: 20px;
+    }
+
+    /* ── STAGE PROGRESS BARS ── */
+    .stage-progress-list {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .stage-prog-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stage-prog-label {
+      font-size: 10px;
       font-weight: 600;
-      min-width: 38px;
+      min-width: 48px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .stage-prog-label.bronze { color: var(--bronze); }
+    .stage-prog-label.silver { color: var(--silver); }
+    .stage-prog-label.gold   { color: var(--gold); }
+
+    .stage-prog-bar {
+      flex: 1;
+      height: 5px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .stage-prog-fill {
+      height: 100%;
+      border-radius: 3px;
+      width: 0%;
+      transition: width 0.6s ease;
+    }
+    .stage-prog-fill.bronze { background: var(--bronze); }
+    .stage-prog-fill.silver { background: var(--silver); }
+    .stage-prog-fill.gold   { background: var(--gold); }
+
+    .stage-prog-pct {
+      font-size: 10px;
+      color: var(--muted);
+      min-width: 28px;
       text-align: right;
     }
 
-    .rule-fail-pct.green { color: var(--green); }
-    .rule-fail-pct.amber { color: var(--amber); }
-    .rule-fail-pct.red   { color: var(--red); }
-
-    @media (max-width: 640px) {
-      .rule-name-col { flex: 0 0 120px; font-size: 12px; }
-    }
-
-    /* ─── gold summary ────────────────────────────────────────── */
-    .gold-section {
-      display: none;
-      margin-bottom: 48px;
-    }
-
-    .gold-section.visible { display: block; }
-
-    .gold-strip {
-      display: flex;
-      gap: 0;
-      border: 1px solid var(--border);
+    /* ── CORRUPTION TOAST ── */
+    .corrupt-toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--bg2);
+      border: 1px solid var(--bronze);
       border-radius: 10px;
-      overflow: hidden;
-      background: white;
+      padding: 12px 16px;
+      max-width: 340px;
+      z-index: 300;
+      font-size: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      display: none;
+      animation: slide-in 0.3s ease;
+    }
+    .corrupt-toast.visible { display: block; }
+
+    @keyframes slide-in {
+      from { transform: translateY(20px); opacity: 0; }
+      to   { transform: translateY(0); opacity: 1; }
     }
 
-    .gold-metric {
-      flex: 1;
-      padding: 20px 24px;
-      border-right: 1px solid var(--border);
-    }
-
-    .gold-metric:last-child { border-right: none; }
-
-    .gold-metric .lbl {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--stone);
+    .corrupt-toast-title {
+      font-weight: 700;
+      color: var(--bronze);
       margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
-    .gold-metric .val {
-      font-family: 'Instrument Serif', Georgia, serif;
-      font-size: 26px;
-      font-weight: 400;
-      color: var(--ink);
-      line-height: 1.1;
-    }
-
-    .gold-metric .val.money::before {
-      content: '$';
+    .corrupt-toast-body { color: var(--text); line-height: 1.5; }
+    .corrupt-toast-close {
+      position: absolute;
+      top: 8px; right: 10px;
+      cursor: pointer;
+      color: var(--muted);
       font-size: 16px;
-      color: var(--stone);
-      vertical-align: super;
-      margin-right: 1px;
+      line-height: 1;
     }
 
-    @media (max-width: 640px) {
-      .gold-strip { flex-direction: column; }
-      .gold-metric { border-right: none; border-bottom: 1px solid var(--border); }
-      .gold-metric:last-child { border-bottom: none; }
-    }
+    /* ── UPLOAD AREA ── */
+    .upload-input { display: none; }
 
-    /* ─── divider ─────────────────────────────────────────────── */
-    .divider {
-      height: 1px;
-      background: var(--border);
-      margin: 40px 0;
-    }
-
-    /* ─── spinner ─────────────────────────────────────────────── */
+    /* ── SPINNER ── */
     .spinner {
       display: inline-block;
-      width: 14px;
-      height: 14px;
+      width: 12px; height: 12px;
       border: 2px solid currentColor;
       border-top-color: transparent;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
       flex-shrink: 0;
     }
-
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ─── toast ───────────────────────────────────────────────── */
-    .toast-bar {
-      display: none;
-      align-items: center;
-      gap: 10px;
-      padding: 12px 16px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      margin-bottom: 24px;
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .main-content { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
+      .right-panel { grid-column: 1; grid-row: 3; border-left: none; border-top: 1px solid var(--border); max-height: 400px; }
+      .bottom-area { grid-template-columns: 1fr; }
+      .sql-panel { border-right: none; }
     }
-
-    .toast-bar.visible { display: flex; }
-    .toast-bar.running { background: var(--accent-light); color: var(--accent); }
-    .toast-bar.done    { background: var(--green-light);  color: var(--green); }
-    .toast-bar.failed  { background: var(--red-light);    color: var(--red); }
   </style>
 </head>
 <body>
-<div class="wrap">
+<div class="page">
 
-  <!-- ── Header ─────────────────────────────────────────────── -->
-  <header class="site-header">
-    <div>
-      <h1 class="site-title">Lakehouse</h1>
-      <div class="site-tagline">Bronze → Silver → Gold &middot; Medallion ETL</div>
+  <!-- ── TOP HEADER ── -->
+  <header class="top-header">
+    <div class="header-brand">
+      <div class="header-icon">&#x1F5C4;</div>
+      <div>
+        <div class="header-title">Lakehouse ETL Pipeline</div>
+        <div class="header-sub">Bronze → Silver → Gold</div>
+      </div>
     </div>
-    <div class="health-dot" id="health-dot">
-      <div class="dot"></div>
-      <span id="health-label">checking…</span>
+
+    <div class="header-divider"></div>
+
+    <div class="header-controls">
+      <select class="ds-select" id="ds-select" onchange="onDatasetChange(this.value)">
+        <option value="ecommerce">&#x1F6D2; E-commerce Transactions (500 rows)</option>
+        <option value="iot">&#x1F4E1; IoT Sensor Readings (1000 rows)</option>
+        <option value="employees">&#x1F464; Employee Records (200 rows)</option>
+        <option value="upload">&#x2B06; Upload Custom CSV…</option>
+      </select>
+
+      <button class="btn btn-run" id="btn-run" onclick="runPipeline()">
+        <span id="btn-run-icon">&#x25B6;</span>
+        <span id="btn-run-text">Run Pipeline</span>
+      </button>
+
+      <div class="corrupt-group">
+        <button class="btn btn-corrupt" onclick="toggleCorruptMenu()">
+          &#x26A0; Inject Corruption &#x25BE;
+        </button>
+        <div class="corrupt-menu" id="corrupt-menu">
+          <div class="corrupt-menu-item" onclick="injectCorruption('nulls')">
+            <span class="ci">&#x2205;</span> Inject Nulls <small style="color:var(--muted);margin-left:auto">10% rows</small>
+          </div>
+          <div class="corrupt-menu-item" onclick="injectCorruption('duplicates')">
+            <span class="ci">&#x29C9;</span> Add Duplicates <small style="color:var(--muted);margin-left:auto">5% rows</small>
+          </div>
+          <div class="corrupt-menu-item" onclick="injectCorruption('type_errors')">
+            <span class="ci">&#x26A1;</span> Type Errors <small style="color:var(--muted);margin-left:auto">8% values</small>
+          </div>
+          <div class="corrupt-menu-item" onclick="injectCorruption('outliers')">
+            <span class="ci">&#x1F4C8;</span> Outliers <small style="color:var(--muted);margin-left:auto">3% rows</small>
+          </div>
+        </div>
+      </div>
+
+      <input type="file" id="csv-upload" class="upload-input" accept=".csv" onchange="handleCsvUpload(this)" />
+    </div>
+
+    <div class="health-indicator">
+      <div class="health-dot" id="health-dot"></div>
+      <span id="health-label">connecting…</span>
     </div>
   </header>
 
-  <!-- ── Toast ──────────────────────────────────────────────── -->
-  <div class="toast-bar" id="toast-bar">
-    <span class="spinner" id="toast-spinner" style="display:none"></span>
-    <span id="toast-text"></span>
-  </div>
+  <!-- ── MAIN ── -->
+  <div class="main-content">
 
-  <!-- ── Trigger ────────────────────────────────────────────── -->
-  <section class="trigger-block">
-    <div class="section-label">Run Pipeline</div>
+    <!-- ── PIPELINE FLOW ── -->
+    <div class="pipeline-section">
+      <div class="section-label">3-Tier Pipeline Flow</div>
+      <div class="pipeline-flow">
 
-    <div class="inputs-row">
-      <div class="field">
-        <label for="batch-size">Batch Size</label>
-        <input type="number" id="batch-size" value="500" min="10" max="50000" />
-      </div>
+        <!-- BRONZE -->
+        <div class="tier-card bronze idle" id="tier-bronze">
+          <div class="tier-header">
+            <div class="tier-icon">&#x1F5C4;</div>
+            <div>
+              <div class="tier-name">BRONZE LAYER</div>
+              <div class="tier-sub">Raw Ingest</div>
+            </div>
+            <div class="tier-status idle" id="bronze-status">
+              <span id="bronze-status-icon">&#x25CB;</span>
+              <span id="bronze-status-text">Idle</span>
+            </div>
+          </div>
+          <div class="tier-stats">
+            <div class="tier-stat">
+              <div class="tier-stat-val muted" id="bronze-rows-in">—</div>
+              <div class="tier-stat-lbl">Rows In</div>
+            </div>
+            <div class="tier-stat">
+              <div class="tier-stat-val muted" id="bronze-rows-out">—</div>
+              <div class="tier-stat-lbl">Rows Out</div>
+            </div>
+          </div>
+          <div class="tier-badges">
+            <span class="badge badge-duration" id="bronze-dur">—</span>
+            <span class="badge badge-pct" id="bronze-pct" style="display:none"></span>
+          </div>
+        </div>
 
-      <div class="slider-wrap">
-        <label for="corruption-slider">Simulated data errors</label>
-        <div class="slider-row">
-          <input type="range" id="corruption-slider" min="0" max="30" step="1" value="8" oninput="updateSlider(this)" />
-          <span class="slider-val" id="slider-val">8%</span>
+        <!-- ARROW 1 -->
+        <div class="pipeline-arrow">
+          <div class="arrow-line">
+            <div class="arrow-line-fill" id="arrow1-fill"></div>
+          </div>
+          <div class="arrow-chevron" id="arrow1-chev">&#x276F;</div>
+        </div>
+
+        <!-- SILVER -->
+        <div class="tier-card silver idle" id="tier-silver">
+          <div class="tier-header">
+            <div class="tier-icon">&#x2699;</div>
+            <div>
+              <div class="tier-name">SILVER LAYER</div>
+              <div class="tier-sub">Clean &amp; Transform</div>
+            </div>
+            <div class="tier-status idle" id="silver-status">
+              <span id="silver-status-icon">&#x25CB;</span>
+              <span id="silver-status-text">Idle</span>
+            </div>
+          </div>
+          <div class="tier-stats">
+            <div class="tier-stat">
+              <div class="tier-stat-val muted" id="silver-rows-in">—</div>
+              <div class="tier-stat-lbl">Rows In</div>
+            </div>
+            <div class="tier-stat">
+              <div class="tier-stat-val muted" id="silver-rows-out">—</div>
+              <div class="tier-stat-lbl">Rows Out</div>
+            </div>
+          </div>
+          <div class="tier-badges">
+            <span class="badge badge-duration" id="silver-dur">—</span>
+            <span class="badge badge-pct" id="silver-pct" style="display:none"></span>
+          </div>
+        </div>
+
+        <!-- ARROW 2 -->
+        <div class="pipeline-arrow">
+          <div class="arrow-line">
+            <div class="arrow-line-fill" id="arrow2-fill"></div>
+          </div>
+          <div class="arrow-chevron" id="arrow2-chev">&#x276F;</div>
+        </div>
+
+        <!-- GOLD -->
+        <div class="tier-card gold idle" id="tier-gold">
+          <div class="tier-header">
+            <div class="tier-icon">&#x2B50;</div>
+            <div>
+              <div class="tier-name">GOLD LAYER</div>
+              <div class="tier-sub">Aggregate &amp; Serve</div>
+            </div>
+            <div class="tier-status idle" id="gold-status">
+              <span id="gold-status-icon">&#x25CB;</span>
+              <span id="gold-status-text">Idle</span>
+            </div>
+          </div>
+          <div class="tier-stats">
+            <div class="tier-stat">
+              <div class="tier-stat-val muted" id="gold-rows-in">—</div>
+              <div class="tier-stat-lbl">Rows In</div>
+            </div>
+            <div class="tier-stat">
+              <div class="tier-stat-val muted" id="gold-rows-out">—</div>
+              <div class="tier-stat-lbl">Aggregates</div>
+            </div>
+          </div>
+          <div class="tier-badges">
+            <span class="badge badge-duration" id="gold-dur">—</span>
+            <span class="badge badge-pct" id="gold-pct" style="display:none"></span>
+          </div>
+        </div>
+
+      </div><!-- /pipeline-flow -->
+    </div><!-- /pipeline-section -->
+
+    <!-- ── RIGHT PANEL ── -->
+    <div class="right-panel">
+
+      <!-- Stats -->
+      <div class="stats-panel">
+        <div class="section-label">Pipeline Stats</div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="s-val" id="stat-total-rows">—</div>
+            <div class="s-lbl">Total Rows</div>
+          </div>
+          <div class="stat-card">
+            <div class="s-val" id="stat-null-rate">—</div>
+            <div class="s-lbl">Null Rate %</div>
+          </div>
+          <div class="stat-card">
+            <div class="s-val" id="stat-dup-rate">—</div>
+            <div class="s-lbl">Dupe Rate %</div>
+          </div>
+          <div class="stat-card">
+            <div class="s-val" id="stat-quality">—</div>
+            <div class="s-lbl">Quality Score</div>
+            <div class="quality-score-bar">
+              <div class="quality-score-fill" id="quality-fill" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:10px;color:var(--muted)" id="stat-last-run">Last run: never</div>
+
+        <!-- Stage progress bars -->
+        <div class="stage-progress-list">
+          <div class="stage-prog-item">
+            <div class="stage-prog-label bronze">Bronze</div>
+            <div class="stage-prog-bar"><div class="stage-prog-fill bronze" id="prog-bronze" style="width:0%"></div></div>
+            <div class="stage-prog-pct" id="prog-bronze-pct">0%</div>
+          </div>
+          <div class="stage-prog-item">
+            <div class="stage-prog-label silver">Silver</div>
+            <div class="stage-prog-bar"><div class="stage-prog-fill silver" id="prog-silver" style="width:0%"></div></div>
+            <div class="stage-prog-pct" id="prog-silver-pct">0%</div>
+          </div>
+          <div class="stage-prog-item">
+            <div class="stage-prog-label gold">Gold</div>
+            <div class="stage-prog-bar"><div class="stage-prog-fill gold" id="prog-gold" style="width:0%"></div></div>
+            <div class="stage-prog-pct" id="prog-gold-pct">0%</div>
+          </div>
         </div>
       </div>
 
-      <button class="btn-run" id="btn-run" onclick="runPipeline()">
-        <i data-lucide="play" style="width:15px;height:15px"></i>
-        Run Pipeline
-      </button>
-    </div>
-
-    <!-- Run history -->
-    <div class="section-label" style="margin-top:8px">Recent Runs</div>
-    <div class="history-table-wrap">
-      <table class="history-table">
-        <thead>
-          <tr>
-            <th>Status</th>
-            <th>Run ID</th>
-            <th>Records Passed</th>
-            <th>Duration</th>
-          </tr>
-        </thead>
-        <tbody id="history-tbody">
-          <tr><td colspan="4" class="empty-note">Hit Run Pipeline to move some data.</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- ── Stage Progress ─────────────────────────────────────── -->
-  <section class="stages-section" id="stages-section">
-    <div class="section-label">Pipeline Progress</div>
-    <div class="stages-row">
-
-      <!-- Bronze -->
-      <div class="stage-block" id="stage-bronze">
-        <div class="stage-name">Bronze</div>
-        <div class="stage-status-text" id="bronze-status-text">Pending</div>
-        <div class="stage-records">
-          <div class="stage-record-item muted" id="bronze-in-wrap">
-            <div class="val" id="bronze-in">—</div>
-            <div class="lbl">records in</div>
-          </div>
-          <div class="stage-record-item muted" id="bronze-out-wrap">
-            <div class="val" id="bronze-out">—</div>
-            <div class="lbl">records out</div>
-          </div>
+      <!-- Live Log -->
+      <div class="log-panel">
+        <div class="log-header">
+          <div class="section-label" style="margin-bottom:0">Live Progress</div>
+          <button class="btn btn-upload" onclick="clearLog()" style="padding:3px 8px;font-size:10px">Clear</button>
+        </div>
+        <div class="log-entries" id="log-entries">
+          <div class="log-empty" id="log-empty">Run the pipeline to see live progress…</div>
         </div>
       </div>
 
-      <div class="stage-connector">
-        <div class="connector-line" id="connector-1"></div>
-        <i data-lucide="chevron-right" class="connector-chevron" id="chevron-1" style="width:16px;height:16px"></i>
-      </div>
+    </div><!-- /right-panel -->
 
-      <!-- Silver -->
-      <div class="stage-block" id="stage-silver">
-        <div class="stage-name">Silver</div>
-        <div class="stage-status-text" id="silver-status-text">Pending</div>
-        <div class="stage-records">
-          <div class="stage-record-item muted" id="silver-in-wrap">
-            <div class="val" id="silver-in">—</div>
-            <div class="lbl">records in</div>
-          </div>
-          <div class="stage-record-item muted" id="silver-out-wrap">
-            <div class="val" id="silver-out">—</div>
-            <div class="lbl">records out</div>
-          </div>
+    <!-- ── BOTTOM AREA ── -->
+    <div class="bottom-area">
+
+      <!-- Data Preview -->
+      <div class="preview-panel">
+        <div class="preview-header">
+          <div class="section-label" style="margin-bottom:0">Data Preview</div>
+          <span id="preview-count" style="font-size:11px;color:var(--muted)"></span>
+        </div>
+        <div class="preview-table-wrap" id="preview-table-wrap">
+          <div style="padding:20px;color:var(--muted);text-align:center;font-size:12px">Select a dataset to preview data</div>
         </div>
       </div>
 
-      <div class="stage-connector">
-        <div class="connector-line" id="connector-2"></div>
-        <i data-lucide="chevron-right" class="connector-chevron" id="chevron-2" style="width:16px;height:16px"></i>
-      </div>
+      <!-- SQL Console -->
+      <div class="sql-panel">
+        <div class="section-label">SQL Query Console</div>
 
-      <!-- Gold -->
-      <div class="stage-block" id="stage-gold">
-        <div class="stage-name">Gold</div>
-        <div class="stage-status-text" id="gold-status-text">Pending</div>
-        <div class="stage-records">
-          <div class="stage-record-item muted" id="gold-in-wrap">
-            <div class="val" id="gold-in">—</div>
-            <div class="lbl">records in</div>
-          </div>
-          <div class="stage-record-item muted" id="gold-out-wrap">
-            <div class="val" id="gold-out">—</div>
-            <div class="lbl">aggregated rows</div>
-          </div>
+        <div class="sql-editor-wrap">
+          <textarea class="sql-editor" id="sql-editor" rows="4"
+            placeholder="SELECT * FROM data LIMIT 10"
+            spellcheck="false">SELECT category, SUM(amount) as total FROM transactions GROUP BY category ORDER BY total DESC</textarea>
         </div>
+
+        <div class="sql-run-row">
+          <button class="btn btn-query" onclick="runQuery()">
+            &#x25B6; Run Query
+          </button>
+          <span class="exec-badge" id="exec-badge" style="display:none"></span>
+          <span style="font-size:10px;color:var(--muted);margin-left:auto">Tables: <code style="color:var(--blue)">data</code>, <code style="color:var(--blue)" id="sql-table-hint">transactions</code></span>
+        </div>
+
+        <div class="sql-error" id="sql-error"></div>
+
+        <div class="sql-results-wrap" id="sql-results-wrap">
+          <table class="data-table" id="sql-results-table">
+            <thead id="sql-results-head"></thead>
+            <tbody id="sql-results-body"></tbody>
+          </table>
+        </div>
+
+        <div id="sql-row-count" style="font-size:10px;color:var(--muted);display:none"></div>
       </div>
 
-    </div>
-  </section>
+    </div><!-- /bottom-area -->
 
-  <!-- ── Quality Gate ───────────────────────────────────────── -->
-  <section class="quality-section" id="quality-section">
-    <div class="section-label">Data Quality Gate</div>
-    <div class="quality-header">
-      <div class="big-pct" id="quality-pct">—%</div>
-      <div class="quality-subtext">
-        <strong id="quality-passed-line">—</strong><br>
-        <span id="quality-quarantine-line">—</span>
-      </div>
-    </div>
-    <div class="rule-list" id="rule-list">
-      <div class="empty-note">No quality data yet.</div>
-    </div>
-  </section>
+  </div><!-- /main-content -->
 
-  <!-- ── Gold Summary ───────────────────────────────────────── -->
-  <section class="gold-section" id="gold-section">
-    <div class="section-label">Gold Layer</div>
-    <div class="gold-strip">
-      <div class="gold-metric">
-        <div class="lbl">Total Revenue</div>
-        <div class="val money" id="gold-revenue">—</div>
-      </div>
-      <div class="gold-metric">
-        <div class="lbl">Avg Order Value</div>
-        <div class="val money" id="gold-aov">—</div>
-      </div>
-      <div class="gold-metric">
-        <div class="lbl">Top Category</div>
-        <div class="val" id="gold-category" style="font-size:18px">—</div>
-      </div>
-      <div class="gold-metric">
-        <div class="lbl">Top Product</div>
-        <div class="val" id="gold-product" style="font-size:18px">—</div>
-      </div>
-    </div>
-  </section>
+</div><!-- /page -->
 
-</div><!-- /wrap -->
+<!-- ── Corruption Toast ── -->
+<div class="corrupt-toast" id="corrupt-toast">
+  <div class="corrupt-toast-close" onclick="closeCorruptToast()">&#x2715;</div>
+  <div class="corrupt-toast-title">&#x26A0; Corruption Injected</div>
+  <div class="corrupt-toast-body" id="corrupt-toast-body"></div>
+</div>
 
 <script>
-/* ── utils ──────────────────────────────────────────────── */
+// ── Utils ──
 const $ = id => document.getElementById(id);
-const fmt   = n  => n == null ? '—' : Number(n).toLocaleString();
-const fmtMoney = v => v == null ? '—' : Number(v).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
-const fmtDur   = s => s == null ? '—' : s.toFixed(1) + 's';
-const fmtTs    = iso => iso ? new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '—';
-const trunc    = (s, n=22) => s && s.length > n ? s.slice(0,n)+'…' : (s || '—');
+const fmt = n => (n == null || n === '') ? '—' : Number(n).toLocaleString();
+const fmtMs = ms => ms < 1000 ? ms + 'ms' : (ms/1000).toFixed(2) + 's';
+const now = () => new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
 
 function esc(s) {
-  if (s == null) return '—';
+  if (s == null) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-async function apiFetch(path, opts={}) {
-  const r = await fetch(path, { headers:{'Content-Type':'application/json'}, ...opts });
-  if (!r.ok) throw new Error(r.status + ' ' + await r.text());
-  return r.json();
-}
+// ── State ──
+let currentDataset = 'ecommerce';
+let pipelineRunning = false;
+const stageOrder = ['bronze','silver','gold'];
 
-/* ── slider ─────────────────────────────────────────────── */
-function updateSlider(el) {
-  $('slider-val').textContent = el.value + '%';
-}
-
-/* ── health ─────────────────────────────────────────────── */
+// ── Health check ──
 async function checkHealth() {
-  const dot = $('health-dot');
-  const lbl = $('health-label');
   try {
-    await apiFetch('/api/health');
-    dot.className = 'health-dot ok';
-    lbl.textContent = 'API healthy';
+    const r = await fetch('/api/health');
+    if (r.ok) {
+      $('health-dot').className = 'health-dot ok';
+      $('health-label').textContent = 'API online';
+    } else { throw new Error(); }
   } catch {
-    dot.className = 'health-dot err';
-    lbl.textContent = 'API unreachable';
+    $('health-dot').className = 'health-dot err';
+    $('health-label').textContent = 'API unreachable';
   }
 }
 
-/* ── toast ──────────────────────────────────────────────── */
-function toast(cls, text, spin=false) {
-  const bar = $('toast-bar');
-  bar.className = 'toast-bar visible ' + cls;
-  $('toast-spinner').style.display = spin ? 'inline-block' : 'none';
-  $('toast-text').textContent = text;
+// ── Dataset change ──
+async function onDatasetChange(val) {
+  if (val === 'upload') {
+    $('csv-upload').click();
+    return;
+  }
+  currentDataset = val;
+  try {
+    const r = await fetch('/api/dataset/select', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({dataset: val}),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const data = await r.json();
+    renderPreview(data.columns, data.preview, data.rows);
+    addLog('info', `Dataset loaded: ${data.label} (${fmt(data.rows)} rows)`, now());
+    updateSqlHint(val);
+  } catch (e) {
+    addLog('err', 'Failed to load dataset: ' + e.message, now());
+  }
+  await loadStats();
 }
 
-function hideToast() {
-  $('toast-bar').className = 'toast-bar';
+function updateSqlHint(ds) {
+  const hints = {ecommerce:'transactions', iot:'sensors', employees:'employees'};
+  const hint = hints[ds] || 'data';
+  $('sql-table-hint').textContent = hint;
+  // Update default query
+  const queries = {
+    ecommerce: "SELECT category, SUM(amount) as total, COUNT(*) as orders\nFROM transactions\nGROUP BY category\nORDER BY total DESC",
+    iot: "SELECT location, AVG(value) as avg_val, COUNT(*) as readings\nFROM sensors\nGROUP BY location\nORDER BY readings DESC",
+    employees: "SELECT dept, COUNT(*) as headcount, ROUND(AVG(salary),2) as avg_salary\nFROM employees\nGROUP BY dept\nORDER BY avg_salary DESC",
+  };
+  if (queries[ds]) $('sql-editor').value = queries[ds];
 }
 
-/* ── stages ─────────────────────────────────────────────── */
-function resetStages() {
-  ['bronze','silver','gold'].forEach(name => {
-    const block = $('stage-' + name);
-    block.className = 'stage-block';
-    const st = $(name + '-status-text');
-    st.className = 'stage-status-text';
-    st.innerHTML = 'Pending';
-    $(name+'-in').textContent  = '—';
-    $(name+'-out').textContent = '—';
-    $(name+'-in-wrap').className  = 'stage-record-item muted';
-    $(name+'-out-wrap').className = 'stage-record-item muted';
+// ── Load stats ──
+async function loadStats() {
+  try {
+    const r = await fetch('/api/pipeline/stats');
+    if (!r.ok) return;
+    const d = await r.json();
+    $('stat-total-rows').textContent = fmt(d.total_rows);
+    $('stat-null-rate').textContent = d.null_rate + '%';
+    $('stat-dup-rate').textContent = d.duplicate_rate + '%';
+    $('stat-quality').textContent = d.quality_score;
+    const qf = $('quality-fill');
+    qf.style.width = d.quality_score + '%';
+    qf.style.background = d.quality_score >= 80 ? 'var(--green)' : d.quality_score >= 60 ? 'var(--bronze)' : 'var(--red)';
+    // Preview
+    if (d.preview && d.preview.length > 0) {
+      renderPreview(d.columns, d.preview, d.total_rows);
+    }
+  } catch {}
+}
+
+// ── Render Preview ──
+function renderPreview(columns, rows, totalRows) {
+  const wrap = $('preview-table-wrap');
+  if (!columns || !rows || rows.length === 0) {
+    wrap.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center">No data</div>';
+    return;
+  }
+
+  const typeMap = {};
+  // Infer types from first non-null value
+  rows.forEach(row => {
+    columns.forEach(col => {
+      if (!(col in typeMap) && row[col] != null) {
+        const v = row[col];
+        if (typeof v === 'number') typeMap[col] = 'num';
+        else if (String(v).match(/^\d{4}-\d{2}-\d{2}/)) typeMap[col] = 'date';
+        else typeMap[col] = 'str';
+      }
+    });
   });
-  $('connector-1').classList.remove('active');
-  $('connector-2').classList.remove('active');
-  $('chevron-1').classList.remove('active');
-  $('chevron-2').classList.remove('active');
+
+  let html = '<table class="data-table"><thead><tr>';
+  columns.forEach(col => {
+    const t = typeMap[col] || 'str';
+    html += `<th>${esc(col)} <span class="type-badge">${t}</span></th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  rows.forEach(row => {
+    html += '<tr>';
+    columns.forEach(col => {
+      const v = row[col];
+      if (v == null) {
+        html += '<td class="null">null</td>';
+      } else {
+        html += `<td title="${esc(String(v))}">${esc(String(v))}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  $('preview-count').textContent = `Showing ${rows.length} of ${fmt(totalRows)} rows`;
 }
 
-function applyStageState(name, state, recIn, recOut) {
-  const block = $('stage-' + name);
-  const st = $(name + '-status-text');
+// ── Pipeline Run (SSE) ──
+async function runPipeline() {
+  if (pipelineRunning) return;
+  pipelineRunning = true;
 
-  block.className = 'stage-block state-' + state;
-  st.className = 'stage-status-text ' + state;
+  // Reset UI
+  $('btn-run').disabled = true;
+  $('btn-run-text').textContent = 'Running…';
+  $('btn-run-icon').innerHTML = '<span class="spinner"></span>';
+
+  resetTiers();
+  clearLog();
+  addLog('info', `Starting pipeline on dataset: ${currentDataset}`, now());
+
+  // Reset progress bars
+  ['bronze','silver','gold'].forEach(s => {
+    $(`prog-${s}`).style.width = '0%';
+    $(`prog-${s}-pct`).textContent = '0%';
+  });
+
+  try {
+    const response = await fetch('/api/pipeline/run', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({dataset: currentDataset}),
+    });
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const {value, done} = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, {stream: true});
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const evt = JSON.parse(line.slice(6));
+            handleSSEEvent(evt);
+          } catch {}
+        }
+      }
+    }
+  } catch (e) {
+    addLog('err', 'Pipeline error: ' + e.message, now());
+  }
+
+  pipelineRunning = false;
+  $('btn-run').disabled = false;
+  $('btn-run-text').textContent = 'Run Pipeline';
+  $('btn-run-icon').textContent = '▶';
+  $('stat-last-run').textContent = 'Last run: ' + new Date().toLocaleTimeString();
+  await loadStats();
+}
+
+function handleSSEEvent(evt) {
+  const {stage, status, rows_in, rows_out, duration_ms, error_msg} = evt;
+
+  if (status === 'running') {
+    setTierState(stage, 'running', rows_in, null, null);
+    animateArrow(stage, 'flowing');
+    addLog('run', `${stage.charAt(0).toUpperCase()+stage.slice(1)}: processing ${fmt(rows_in)} rows…`, now());
+    setProgressBar(stage, 50);
+  } else if (status === 'complete') {
+    const pct = rows_in > 0 ? Math.round(rows_out / rows_in * 100) : 100;
+    setTierState(stage, 'complete', rows_in, rows_out, duration_ms);
+    animateArrow(stage, 'done');
+    addLog('ok', `${stage.charAt(0).toUpperCase()+stage.slice(1)}: ${fmt(rows_out)} rows in ${fmtMs(duration_ms)}`, now());
+    setProgressBar(stage, 100);
+    setArrowDone(stage);
+  } else if (status === 'error') {
+    setTierState(stage, 'error', rows_in, null, null);
+    addLog('err', `${stage}: ERROR — ${error_msg || 'unknown error'}`, now());
+    setProgressBar(stage, 100, true);
+  }
+}
+
+function resetTiers() {
+  ['bronze','silver','gold'].forEach(s => {
+    const card = $(`tier-${s}`);
+    card.className = `tier-card ${s} idle`;
+    $(`${s}-status`).className = 'tier-status idle';
+    $(`${s}-status-icon`).textContent = '○';
+    $(`${s}-status-text`).textContent = 'Idle';
+    $(`${s}-rows-in`).textContent = '—';
+    $(`${s}-rows-in`).className = 'tier-stat-val muted';
+    $(`${s}-rows-out`).textContent = '—';
+    $(`${s}-rows-out`).className = 'tier-stat-val muted';
+    $(`${s}-dur`).textContent = '—';
+    const pct = $(`${s}-pct`);
+    if (pct) pct.style.display = 'none';
+  });
+  ['arrow1-fill','arrow2-fill'].forEach(id => {
+    const el = $(id);
+    if (el) { el.className = 'arrow-line-fill'; }
+  });
+  ['arrow1-chev','arrow2-chev'].forEach(id => {
+    const el = $(id);
+    if (el) el.className = 'arrow-chevron';
+  });
+}
+
+function setTierState(stage, state, rowsIn, rowsOut, durationMs) {
+  const card = $(`tier-${stage}`);
+  card.className = `tier-card ${stage} state-${state}`;
+
+  const statusEl = $(`${stage}-status`);
+  const iconEl = $(`${stage}-status-icon`);
+  const textEl = $(`${stage}-status-text`);
 
   if (state === 'running') {
-    st.innerHTML = '<span class="pulse-dot"></span>Running';
-  } else if (state === 'done') {
-    st.innerHTML = '<i data-lucide="check" style="width:14px;height:14px"></i>&nbsp;Done';
-  } else if (state === 'failed') {
-    st.innerHTML = 'Failed';
-  } else {
-    st.innerHTML = 'Pending';
+    statusEl.className = 'tier-status running';
+    iconEl.innerHTML = '<span class="pulse-ring"></span>';
+    textEl.textContent = 'Running';
+  } else if (state === 'complete') {
+    statusEl.className = 'tier-status complete';
+    iconEl.textContent = '✓';
+    textEl.textContent = 'Complete';
+  } else if (state === 'error') {
+    statusEl.className = 'tier-status error';
+    iconEl.textContent = '✗';
+    textEl.textContent = 'Error';
   }
 
-  if (recIn  != null) { $(name+'-in').textContent  = fmt(recIn);  $(name+'-in-wrap').className  = 'stage-record-item'; }
-  if (recOut != null) { $(name+'-out').textContent = fmt(recOut); $(name+'-out-wrap').className = 'stage-record-item'; }
-
-  lucide.createIcons();
+  if (rowsIn != null) {
+    $(`${stage}-rows-in`).textContent = fmt(rowsIn);
+    $(`${stage}-rows-in`).className = 'tier-stat-val';
+  }
+  if (rowsOut != null) {
+    $(`${stage}-rows-out`).textContent = fmt(rowsOut);
+    $(`${stage}-rows-out`).className = 'tier-stat-val';
+    if (rowsIn != null && rowsIn > 0) {
+      const pct = Math.round(rowsOut / rowsIn * 100);
+      const pctEl = $(`${stage}-pct`);
+      if (pctEl) {
+        pctEl.textContent = pct + '%';
+        pctEl.style.display = 'inline';
+        pctEl.className = `badge badge-pct ${pct < 90 ? 'warn' : ''}`;
+      }
+    }
+  }
+  if (durationMs != null) {
+    $(`${stage}-dur`).textContent = fmtMs(durationMs);
+  }
 }
 
-function applyStages(stages) {
-  const map = {};
-  (stages || []).forEach(s => { map[s.stage] = s; });
-
-  const stateOf = s => {
-    if (!s) return 'pending';
-    if (s.status === 'completed') return 'done';
-    if (s.status === 'running')   return 'running';
-    if (s.status === 'failed')    return 'failed';
-    return 'pending';
-  };
-
-  const b = map['bronze'], sv = map['silver'], g = map['gold'];
-
-  applyStageState('bronze', stateOf(b), b?.records_in, b?.records_out);
-  applyStageState('silver', stateOf(sv), sv?.records_in, sv?.records_out);
-  applyStageState('gold',   stateOf(g),  g?.records_in,  g?.records_out);
-
-  if (stateOf(b)  === 'done') { $('connector-1').classList.add('active'); $('chevron-1').classList.add('active'); }
-  if (stateOf(sv) === 'done') { $('connector-2').classList.add('active'); $('chevron-2').classList.add('active'); }
+function animateArrow(stage, mode) {
+  const arrowMap = {bronze: 'arrow1', silver: 'arrow2'};
+  const id = arrowMap[stage];
+  if (!id) return;
+  const fill = $(`${id}-fill`);
+  if (!fill) return;
+  fill.className = 'arrow-line-fill ' + (mode === 'flowing' ? 'flowing' : mode === 'done' ? 'done' : '');
 }
 
-/* ── quality ────────────────────────────────────────────── */
-function renderQuality(qr) {
-  if (!qr) return;
-  $('quality-section').classList.add('visible');
-
-  const passPct = qr.total_records > 0
-    ? Math.round((qr.passed / qr.total_records) * 100)
-    : 0;
-
-  $('quality-pct').textContent = passPct + '%';
-  $('quality-passed-line').textContent = fmt(qr.passed) + ' records made it through clean';
-  $('quality-quarantine-line').textContent = fmt(qr.failed) + ' quarantined';
-
-  const list = $('rule-list');
-  list.innerHTML = '';
-
-  (qr.failure_breakdown_by_rule || []).forEach(r => {
-    const total = (r.passed || 0) + (r.failed || 0);
-    const failPct = total > 0 ? (r.failed / total) * 100 : 0;
-    const barPct  = Math.min(failPct, 100);
-    const color   = failPct < 5 ? 'green' : failPct < 20 ? 'amber' : 'red';
-
-    const row = document.createElement('div');
-    row.className = 'rule-row';
-    row.innerHTML = `
-      <div class="rule-name-col">${esc(r.rule_name)}</div>
-      <div class="rule-bar-col">
-        <div class="rule-bar-track">
-          <div class="rule-bar-fill ${color}" style="width:${barPct.toFixed(1)}%"></div>
-        </div>
-        <div class="rule-fail-pct ${color}">${failPct.toFixed(1)}%</div>
-      </div>`;
-    list.appendChild(row);
-  });
+function setArrowDone(stage) {
+  const arrowMap = {bronze: 'arrow1', silver: 'arrow2'};
+  const id = arrowMap[stage];
+  if (!id) return;
+  const chev = $(`${id}-chev`);
+  if (chev) chev.className = 'arrow-chevron active';
 }
 
-/* ── gold ───────────────────────────────────────────────── */
-async function loadGold() {
+function setProgressBar(stage, pct, isError = false) {
+  const fill = $(`prog-${stage}`);
+  const label = $(`prog-${stage}-pct`);
+  if (fill) {
+    fill.style.width = pct + '%';
+    if (isError) fill.style.background = 'var(--red)';
+  }
+  if (label) label.textContent = pct + '%';
+}
+
+// ── Log ──
+function addLog(type, text, time) {
+  const empty = $('log-empty');
+  if (empty) empty.remove();
+
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+
+  const icons = {ok:'✓', run:'⟳', err:'✗', info:'ℹ'};
+  entry.innerHTML = `
+    <span class="log-icon ${type}">${icons[type] || 'ℹ'}</span>
+    <span class="log-text">${esc(text)}</span>
+    <span class="log-time">${time}</span>
+  `;
+
+  const entries = $('log-entries');
+  entries.appendChild(entry);
+  entries.scrollTop = entries.scrollHeight;
+}
+
+function clearLog() {
+  const entries = $('log-entries');
+  entries.innerHTML = '<div class="log-empty" id="log-empty">Run the pipeline to see live progress…</div>';
+}
+
+// ── CSV Upload ──
+async function handleCsvUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+
   try {
-    const g = await apiFetch('/api/gold/summary');
-    $('gold-section').classList.add('visible');
-    $('gold-revenue').textContent  = fmtMoney(g.total_revenue);
-    $('gold-aov').textContent      = fmtMoney(g.avg_order_value);
-    $('gold-category').textContent = g.top_category || g.unique_categories || '—';
-    $('gold-product').textContent  = g.top_product  || '—';
-  } catch { /* not ready yet */ }
-}
-
-/* ── history ────────────────────────────────────────────── */
-async function loadHistory() {
-  try {
-    const runs = await apiFetch('/api/pipeline/runs');
-    const tbody = $('history-tbody');
-    tbody.innerHTML = '';
-
-    if (!runs || runs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" class="empty-note">Hit Run Pipeline to move some data.</td></tr>';
+    const r = await fetch('/api/upload', {method: 'POST', body: formData});
+    if (!r.ok) {
+      const e = await r.json();
+      addLog('err', 'Upload failed: ' + (e.detail || 'unknown error'), now());
+      // Reset select
+      $('ds-select').value = currentDataset;
       return;
     }
-
-    runs.slice(0, 5).forEach(run => {
-      const st = (run.status || 'pending').toLowerCase();
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><span class="status-pill ${st}"><span class="dot"></span>${esc(run.status)}</span></td>
-        <td class="mono" style="font-size:12px;color:var(--stone)">${esc(trunc(run.run_id, 20))}</td>
-        <td class="mono">${fmt(run.records_passed)}</td>
-        <td class="mono" style="color:var(--stone)">${fmtDur(run.duration_seconds)}</td>`;
-      tbody.appendChild(tr);
-    });
-  } catch { /* ignore */ }
-}
-
-/* ── polling ────────────────────────────────────────────── */
-let _poll = null;
-
-async function pollStatus(runId) {
-  try {
-    const run = await apiFetch(`/api/pipeline/${runId}/status`);
-    applyStages(run.stages);
-
-    if (run.status === 'running' || run.status === 'pending') {
-      const active = (run.stages || []).find(s => s.status === 'running');
-      const stage  = active ? active.stage.charAt(0).toUpperCase() + active.stage.slice(1) : 'Pipeline';
-      toast('running', stage + ' stage running…', true);
-      return;
-    }
-
-    clearInterval(_poll);
-    $('btn-run').disabled = false;
-
-    if (run.status === 'completed') {
-      toast('done', 'Done — ' + fmt(run.quality_report?.passed) + ' records made it through clean.');
-      renderQuality(run.quality_report);
-      await loadGold();
-      await loadHistory();
-    } else {
-      toast('failed', 'Run failed: ' + (run.error || 'unknown error'));
-    }
-  } catch { /* network blip — keep polling */ }
-}
-
-/* ── run pipeline ───────────────────────────────────────── */
-async function runPipeline() {
-  const batchSize = parseInt($('batch-size').value, 10) || 500;
-  const corruptionRate = parseInt($('corruption-slider').value, 10) / 100;
-
-  $('btn-run').disabled = true;
-  $('stages-section').classList.add('visible');
-  $('quality-section').classList.remove('visible');
-  $('gold-section').classList.remove('visible');
-  resetStages();
-  applyStageState('bronze', 'running', null, null);
-  toast('running', 'Starting pipeline…', true);
-
-  try {
-    const run = await apiFetch('/api/pipeline/run', {
-      method: 'POST',
-      body: JSON.stringify({ batch_size: batchSize, corruption_rate: corruptionRate }),
-    });
-
-    if (_poll) clearInterval(_poll);
-    _poll = setInterval(() => pollStatus(run.run_id), 2000);
-
+    const data = await r.json();
+    currentDataset = 'upload:' + file.name;
+    addLog('ok', `Uploaded ${file.name}: ${fmt(data.rows)} rows, ${data.columns.length} columns`, now());
+    renderPreview(data.columns, data.preview, data.rows);
+    $('sql-table-hint').textContent = 'data';
+    $('sql-editor').value = 'SELECT * FROM data LIMIT 20';
+    await loadStats();
   } catch (e) {
-    toast('failed', 'Could not start run: ' + e.message);
-    $('btn-run').disabled = false;
+    addLog('err', 'Upload error: ' + e.message, now());
+    $('ds-select').value = currentDataset;
+  }
+  input.value = '';
+}
+
+// ── Corruption ──
+function toggleCorruptMenu() {
+  $('corrupt-menu').classList.toggle('open');
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.corrupt-group')) {
+    $('corrupt-menu').classList.remove('open');
+  }
+});
+
+async function injectCorruption(type) {
+  $('corrupt-menu').classList.remove('open');
+  try {
+    const r = await fetch('/api/inject-corruption', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({type}),
+    });
+    if (!r.ok) {
+      const e = await r.json();
+      addLog('err', 'Corruption failed: ' + (e.detail || 'unknown'), now());
+      return;
+    }
+    const d = await r.json();
+    showCorruptToast(d.description, d.injected_count);
+    addLog('info', `Corruption injected: ${d.description}`, now());
+    await loadStats();
+    await onDatasetChange(currentDataset.split(':')[0]); // refresh preview
+  } catch (e) {
+    addLog('err', 'Corruption error: ' + e.message, now());
   }
 }
 
-/* ── init ───────────────────────────────────────────────── */
-lucide.createIcons();
-checkHealth();
-loadHistory();
-loadGold();
+function showCorruptToast(desc, count) {
+  $('corrupt-toast-body').innerHTML = `
+    <strong>${fmt(count)} records affected.</strong><br>
+    ${esc(desc)}<br>
+    <span style="color:var(--muted);font-size:11px;margin-top:4px;display:block">Re-run the pipeline to see cleaning in action.</span>
+  `;
+  const toast = $('corrupt-toast');
+  toast.classList.add('visible');
+  setTimeout(() => toast.classList.remove('visible'), 6000);
+}
 
-setInterval(loadHistory, 20000);
+function closeCorruptToast() {
+  $('corrupt-toast').classList.remove('visible');
+}
+
+// ── SQL Query ──
+async function runQuery() {
+  const sql = $('sql-editor').value.trim();
+  if (!sql) return;
+
+  $('sql-error').classList.remove('visible');
+  $('sql-results-wrap').classList.remove('visible');
+  $('exec-badge').style.display = 'none';
+  $('sql-row-count').style.display = 'none';
+
+  try {
+    const r = await fetch('/api/query', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({sql}),
+    });
+
+    if (!r.ok) {
+      const e = await r.json();
+      $('sql-error').textContent = e.detail || 'Query failed';
+      $('sql-error').classList.add('visible');
+      return;
+    }
+
+    const d = await r.json();
+    $('exec-badge').textContent = fmtMs(d.execution_ms);
+    $('exec-badge').style.display = 'inline';
+
+    // Render results
+    renderSqlResults(d.columns, d.rows, d.row_count);
+  } catch (e) {
+    $('sql-error').textContent = 'Network error: ' + e.message;
+    $('sql-error').classList.add('visible');
+  }
+}
+
+function renderSqlResults(columns, rows, rowCount) {
+  if (!columns || !rows) return;
+
+  let html = '<thead><tr>';
+  columns.forEach(c => { html += `<th>${esc(c)}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  if (rows.length === 0) {
+    html += `<tr><td colspan="${columns.length}" style="text-align:center;color:var(--muted);padding:16px">No rows returned</td></tr>`;
+  } else {
+    rows.forEach(row => {
+      html += '<tr>';
+      row.forEach(cell => {
+        if (cell == null) {
+          html += '<td class="null">null</td>';
+        } else {
+          html += `<td>${esc(String(cell))}</td>`;
+        }
+      });
+      html += '</tr>';
+    });
+  }
+  html += '</tbody>';
+
+  $('sql-results-table').innerHTML = html;
+  $('sql-results-wrap').classList.add('visible');
+
+  const rc = $('sql-row-count');
+  rc.textContent = `${fmt(rowCount)} row${rowCount !== 1 ? 's' : ''}${rowCount > 50 ? ' (showing first 50)' : ''}`;
+  rc.style.display = 'block';
+}
+
+// ── Keyboard shortcut ──
+$('sql-editor').addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    runQuery();
+  }
+});
+
+// ── Init ──
+async function init() {
+  checkHealth();
+  setInterval(checkHealth, 30000);
+
+  // Load initial dataset
+  try {
+    await onDatasetChange('ecommerce');
+  } catch {}
+
+  await loadStats();
+}
+
+init();
 </script>
 </body>
 </html>
