@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lakehouse ETL Pipeline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap" rel="stylesheet" />
   <style>
     :root {
       --bg:        #0a0e1a;
@@ -29,13 +32,18 @@
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     html, body {
       background: var(--bg);
       color: var(--text);
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-family: 'Nunito', 'Segoe UI', system-ui, -apple-system, sans-serif;
       font-size: 13px;
       line-height: 1.5;
       min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
     }
 
     /* ── Scrollbars ── */
@@ -122,11 +130,11 @@
       gap: 6px;
       padding: 7px 16px;
       border: none;
-      border-radius: 6px;
+      border-radius: 50rem;
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
-      transition: opacity 0.15s, transform 0.1s;
+      transition: opacity 0.15s, transform 0.2s, box-shadow 0.2s;
       white-space: nowrap;
       outline: none;
     }
@@ -137,6 +145,13 @@
     .btn-run {
       background: linear-gradient(135deg, #16a34a, #22c55e);
       color: #fff;
+      padding: 9px 22px;
+      font-size: 13px;
+    }
+    .btn-run:hover {
+      opacity: 1;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(5,150,105,0.4);
     }
 
     .btn-upload {
@@ -232,11 +247,16 @@
       flex: 1;
       background: var(--bg2);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 1.5rem;
       padding: 16px;
-      transition: border-color 0.3s, box-shadow 0.3s;
+      transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
       position: relative;
       overflow: hidden;
+    }
+
+    .tier-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.3);
     }
 
     .tier-card::before {
@@ -244,7 +264,7 @@
       position: absolute;
       top: 0; left: 0; right: 0;
       height: 3px;
-      border-radius: 10px 10px 0 0;
+      border-radius: 1.5rem 1.5rem 0 0;
     }
 
     .tier-card.bronze::before { background: var(--bronze); }
@@ -437,7 +457,7 @@
       overflow: auto;
       max-height: 340px;
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 1.25rem;
     }
 
     table.data-table {
@@ -506,11 +526,11 @@
       width: 100%;
       background: #0d1117;
       border: 1px solid var(--border2);
-      border-radius: 8px;
+      border-radius: 1.25rem;
       color: #c9d1d9;
       font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
       font-size: 12px;
-      padding: 12px;
+      padding: 14px 16px;
       resize: vertical;
       min-height: 90px;
       outline: none;
@@ -585,7 +605,7 @@
     .stat-card {
       background: var(--bg3);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 1.5rem;
       padding: 12px;
     }
 
@@ -782,6 +802,25 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── Scroll Reveal ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.65s cubic-bezier(0.16,1,0.3,1), transform 0.65s cubic-bezier(0.16,1,0.3,1);
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── Pipeline arrow dash animation ── */
+    @keyframes dash { to { stroke-dashoffset: -20; } }
+    .pipeline-arrow.running { animation: dash 0.8s linear infinite; }
+
+    /* ── Log entry fade-in ── */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .log-entry { animation: fadeIn 0.3s ease; }
+
     /* ── Responsive ── */
     @media (max-width: 900px) {
       .main-content { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
@@ -857,7 +896,7 @@
       <div class="pipeline-flow">
 
         <!-- BRONZE -->
-        <div class="tier-card bronze idle" id="tier-bronze">
+        <div class="tier-card bronze idle reveal" id="tier-bronze" style="transition-delay:0ms">
           <div class="tier-header">
             <div class="tier-icon">&#x1F5C4;</div>
             <div>
@@ -894,7 +933,7 @@
         </div>
 
         <!-- SILVER -->
-        <div class="tier-card silver idle" id="tier-silver">
+        <div class="tier-card silver idle reveal" id="tier-silver" style="transition-delay:100ms">
           <div class="tier-header">
             <div class="tier-icon">&#x2699;</div>
             <div>
@@ -931,7 +970,7 @@
         </div>
 
         <!-- GOLD -->
-        <div class="tier-card gold idle" id="tier-gold">
+        <div class="tier-card gold idle reveal" id="tier-gold" style="transition-delay:200ms">
           <div class="tier-header">
             <div class="tier-icon">&#x2B50;</div>
             <div>
@@ -960,6 +999,14 @@
         </div>
 
       </div><!-- /pipeline-flow -->
+
+      <!-- ── WAVE DIVIDER ── -->
+      <div style="line-height:0;margin:2rem 0 0;">
+        <svg viewBox="0 0 1440 50" preserveAspectRatio="none" style="display:block;width:100%;height:50px;opacity:0.25;">
+          <path d="M0,25 C480,50 960,0 1440,25 L1440,50 L0,50 Z" fill="#f59e0b"/>
+        </svg>
+      </div>
+
     </div><!-- /pipeline-section -->
 
     <!-- ── RIGHT PANEL ── -->
@@ -969,19 +1016,19 @@
       <div class="stats-panel">
         <div class="section-label">Pipeline Stats</div>
         <div class="stats-grid">
-          <div class="stat-card">
+          <div class="stat-card reveal">
             <div class="s-val" id="stat-total-rows">—</div>
             <div class="s-lbl">Total Rows</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card reveal">
             <div class="s-val" id="stat-null-rate">—</div>
             <div class="s-lbl">Null Rate %</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card reveal">
             <div class="s-val" id="stat-dup-rate">—</div>
             <div class="s-lbl">Dupe Rate %</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card reveal">
             <div class="s-val" id="stat-quality">—</div>
             <div class="s-lbl">Quality Score</div>
             <div class="quality-score-bar">
@@ -1028,7 +1075,7 @@
     <div class="bottom-area">
 
       <!-- Data Preview -->
-      <div class="preview-panel">
+      <div class="preview-panel reveal">
         <div class="preview-header">
           <div class="section-label" style="margin-bottom:0">Data Preview</div>
           <span id="preview-count" style="font-size:11px;color:var(--muted)"></span>
@@ -1039,7 +1086,7 @@
       </div>
 
       <!-- SQL Console -->
-      <div class="sql-panel">
+      <div class="sql-panel reveal">
         <div class="section-label">SQL Query Console</div>
 
         <div class="sql-editor-wrap">
@@ -1279,17 +1326,20 @@ function handleSSEEvent(evt) {
   if (status === 'running') {
     setTierState(stage, 'running', rows_in, null, null);
     animateArrow(stage, 'flowing');
+    setArrowRunning(stage, true);
     addLog('run', `${stage.charAt(0).toUpperCase()+stage.slice(1)}: processing ${fmt(rows_in)} rows…`, now());
     setProgressBar(stage, 50);
   } else if (status === 'complete') {
     const pct = rows_in > 0 ? Math.round(rows_out / rows_in * 100) : 100;
     setTierState(stage, 'complete', rows_in, rows_out, duration_ms);
     animateArrow(stage, 'done');
+    setArrowRunning(stage, false);
     addLog('ok', `${stage.charAt(0).toUpperCase()+stage.slice(1)}: ${fmt(rows_out)} rows in ${fmtMs(duration_ms)}`, now());
     setProgressBar(stage, 100);
     setArrowDone(stage);
   } else if (status === 'error') {
     setTierState(stage, 'error', rows_in, null, null);
+    setArrowRunning(stage, false);
     addLog('err', `${stage}: ERROR — ${error_msg || 'unknown error'}`, now());
     setProgressBar(stage, 100, true);
   }
@@ -1572,10 +1622,38 @@ $('sql-editor').addEventListener('keydown', e => {
   }
 });
 
+// ── Scroll Reveal ──
+function initReveal() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+}
+
+// ── Pipeline arrow running state ──
+function setArrowRunning(stage, running) {
+  const arrowMap = {bronze: 0, silver: 1};
+  const arrows = document.querySelectorAll('.pipeline-arrow');
+  const idx = arrowMap[stage];
+  if (idx == null || !arrows[idx]) return;
+  if (running) {
+    arrows[idx].classList.add('running');
+  } else {
+    arrows[idx].classList.remove('running');
+  }
+}
+
 // ── Init ──
 async function init() {
   checkHealth();
   setInterval(checkHealth, 30000);
+
+  initReveal();
 
   // Load initial dataset
   try {
