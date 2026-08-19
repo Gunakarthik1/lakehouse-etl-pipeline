@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg:        #242020;
+      --bg:        #1c1a0e;
       --bg2:       #1e1b1b;
       --bg3:       #1e1b1b;
       --border:    rgba(255,255,255,0.08);
@@ -37,10 +37,10 @@
     }
 
     html, body {
-      background-color: #242020;
+      background-color: #1c1a0e;
       background-image:
-        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+        linear-gradient(rgba(251,191,36,0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(251,191,36,0.018) 1px, transparent 1px);
       background-size: 30px 30px;
       color: var(--text);
       font-family: 'Nunito', 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -147,17 +147,17 @@
     .btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
 
     .btn-run {
-      background: linear-gradient(135deg, #f09060, #fbb485);
-      color: #1a0e08;
+      background: linear-gradient(135deg, #d97706, #fbbf24);
+      color: #120a00;
       font-weight: 900;
-      box-shadow: 0 4px 20px rgba(240,144,96,0.35);
+      box-shadow: 0 4px 20px rgba(217,119,6,0.4);
       padding: 9px 22px;
       font-size: 13px;
     }
     .btn-run:hover {
       opacity: 1;
       transform: translateY(-3px);
-      box-shadow: 0 10px 32px rgba(240,144,96,0.45);
+      box-shadow: 0 10px 32px rgba(251,191,36,0.5);
     }
 
     .btn-upload {
@@ -271,7 +271,7 @@
       top: 0; left: 0; right: 0;
       height: 3px;
       border-radius: 1.5rem 1.5rem 0 0;
-      background: linear-gradient(90deg, #7b5ea7, #c85878, #e8836a, #d4a64a, #c8b84a);
+      background: linear-gradient(90deg, #78350f, #b45309, #d97706, #fbbf24, #fef08a);
     }
 
     .tier-card.state-running {
@@ -619,7 +619,7 @@
       position: absolute;
       top: 0; left: 0; right: 0;
       height: 3px;
-      background: linear-gradient(90deg, #7b5ea7, #c85878, #e8836a, #d4a64a, #c8b84a);
+      background: linear-gradient(90deg, #78350f, #b45309, #d97706, #fbbf24, #fef08a);
     }
 
     .stat-card .s-val {
@@ -903,17 +903,17 @@
   <!-- ── RAINBOW STRIPE ── -->
   <div style="position:relative;height:110px;overflow:hidden;pointer-events:none;" aria-hidden="true">
     <svg viewBox="0 0 1440 110" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="position:absolute;bottom:0;left:0;width:100%;height:auto;">
-      <path d="M-100,70 C200,10 500,100 800,50 C1100,0 1300,80 1540,40" fill="none" stroke="#7b5ea7" stroke-width="18" stroke-linecap="round" opacity="0.55"/>
-      <path d="M-100,82 C200,22 500,112 800,62 C1100,12 1300,92 1540,52" fill="none" stroke="#c85878" stroke-width="15" stroke-linecap="round" opacity="0.5"/>
-      <path d="M-100,94 C200,34 500,124 800,74 C1100,24 1300,104 1540,64" fill="none" stroke="#e8836a" stroke-width="13" stroke-linecap="round" opacity="0.45"/>
-      <path d="M-100,106 C200,46 500,136 800,86 C1100,36 1300,116 1540,76" fill="none" stroke="#d4a64a" stroke-width="11" stroke-linecap="round" opacity="0.4"/>
-      <path d="M-100,118 C200,58 500,148 800,98 C1100,48 1300,128 1540,88" fill="none" stroke="#c8b84a" stroke-width="9" stroke-linecap="round" opacity="0.35"/>
+      <path d="M-100,70 C200,10 500,100 800,50 C1100,0 1300,80 1540,40" fill="none" stroke="#78350f" stroke-width="18" stroke-linecap="round" opacity="0.65"/>
+      <path d="M-100,82 C200,22 500,112 800,62 C1100,12 1300,92 1540,52" fill="none" stroke="#b45309" stroke-width="15" stroke-linecap="round" opacity="0.6"/>
+      <path d="M-100,94 C200,34 500,124 800,74 C1100,24 1300,104 1540,64" fill="none" stroke="#d97706" stroke-width="13" stroke-linecap="round" opacity="0.55"/>
+      <path d="M-100,106 C200,46 500,136 800,86 C1100,36 1300,116 1540,76" fill="none" stroke="#fbbf24" stroke-width="11" stroke-linecap="round" opacity="0.5"/>
+      <path d="M-100,118 C200,58 500,148 800,98 C1100,48 1300,128 1540,88" fill="none" stroke="#fef08a" stroke-width="9" stroke-linecap="round" opacity="0.45"/>
     </svg>
   </div>
 
   <!-- ── HERO ── -->
   <div style="max-width:1400px;margin:0 auto;padding:40px 24px 16px;">
-    <div style="font-size:11px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#f09060;margin-bottom:10px;">Medallion Architecture</div>
+    <div style="font-size:11px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#fbbf24;margin-bottom:10px;">Medallion Architecture</div>
     <h1 style="font-size:clamp(2rem,4vw,3rem);font-weight:900;color:#f0ece8;line-height:1.15;letter-spacing:-0.03em;margin-bottom:12px;">Bronze &#x2192; Silver &#x2192; Gold.<br>ETL that actually runs.</h1>
     <p style="font-size:15px;color:#a09890;max-width:540px;font-weight:500;">6 configurable data quality rules, quarantine layer, lineage tracking, and Parquet-backed aggregations &mdash; end to end in one pipeline.</p>
   </div>
